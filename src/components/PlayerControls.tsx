@@ -3,7 +3,7 @@ import { RepeatMode } from '@/types/music';
 import { cn } from '@/utils/cn';
 
 interface PlayerControlsProps {
-  audioRef: React.RefObject<HTMLAudioElement>; // ВАЖНО: Новият проп за достъп до аудио елемента
+  audioRef: React.RefObject<HTMLAudioElement>;
   isPlaying: boolean;
   isLoading: boolean;
   shuffle: boolean;
@@ -61,7 +61,7 @@ export function PlayerControls({
   const audioCtxRef = useRef<AudioContext | null>(null);
   const nodesRef = useRef<any>({});
 
- // --- SPATIAL AUDIO ИНИЦИАЛИЗАЦИЯ ---
+  // --- SPATIAL AUDIO ИНИЦИАЛИЗАЦИЯ ---
   useEffect(() => {
     // Инициализираме само ако имаме аудио елемент и все още нямаме създаден контекст
     if (audioRef.current && !audioCtxRef.current) {
@@ -106,86 +106,6 @@ export function PlayerControls({
       reverb.connect(reverbGain);
       reverbGain.connect(wetGain);
 
-      wetGain.connect(audioCtx.destination);
-
-      nodesRef.current = { panner, reverb, dryGain, wetGain };
-
-      // Генериране на изкуствено ехо (Synthetic Impulse Response)
-      const duration = 0.4; // дължина на ехото в секунди
-      const sampleRate = audioCtx.sampleRate;
-      const length = sampleRate * duration;
-      const impulse = audioCtx.createBuffer(2, length, sampleRate);
-      const left = impulse.getChannelData(0);
-      const right = impulse.getChannelData(1);
-      
-      for (let i = 0; i < length; i++) {
-        // Плавно затихване на ехото
-        const factor = Math.exp(-i / (sampleRate * 0.5)); 
-        left[i] = (Math.random() * 2 - 1) * factor;
-        right[i] = (Math.random() * 2 - 1) * factor;
-      }
-      
-      reverb.buffer = impulse;
-      setIrLoaded(true); // Веднага активираме бутона!
-    }
-  }, [audioRef]);
-      const reverb = audioCtx.createConvolver();
-      const panner = audioCtx.createPanner();
-      const dryGain = audioCtx.createGain();
-      const wetGain = audioCtx.createGain();
-      const reverbGain = audioCtx.createGain(); // НОВО: Отделен контрол за силата на ехото
-
-      // Настройки на Panner
-      panner.panningModel = 'HRTF';
-      panner.distanceModel = 'inverse';
-      panner.refDistance = 1;
-      panner.maxDistance = 10000;
-      panner.rolloffFactor = 1;
-      panner.positionX.value = 0.2;
-      panner.positionY.value = 0;
-      panner.positionZ.value = -1.2;
-
-      dryGain.gain.value = 1;
-      wetGain.gain.value = 0;
-      
-      // ТУК ЗАДАВАМЕ СИЛАТА НА ЕХОТО (0.15 = 15%)
-      // Ако пак ти е много, направи го 0.05. Ако не искаш никакво ехо, направи го 0.
-      reverbGain.gain.value = 0.15; 
-
-      // --- ПАРАЛЕЛНА DSP ВЕРИГА ---
-      
-      // 1. Нормален (чист) звук при изключен Spatial
-      source.connect(dryGain).connect(audioCtx.destination);
-      
-      // 2. Чист 3D звук (Panner) -> отива директно в WetGain
-      source.connect(panner);
-      panner.connect(wetGain);
-      
-      // 3. Добавяме леко ехо (Reverb) паралелно
-      panner.connect(reverb);
-      reverb.connect(reverbGain);
-      reverbGain.connect(wetGain);
-
-      wetGain.connect(audioCtx.destination);
-
-      // Настройки на Panner
-      panner.panningModel = 'HRTF';
-      panner.distanceModel = 'inverse';
-      panner.refDistance = 1;
-      panner.maxDistance = 10000;
-      panner.rolloffFactor = 1;
-      panner.positionX.value = 0.2;
-      panner.positionY.value = 0;
-      panner.positionZ.value = -1.2;
-
-      dryGain.gain.value = 1;
-      wetGain.gain.value = 0;
-
-      // Правилната DSP верига
-      source.connect(dryGain).connect(audioCtx.destination);
-      source.connect(panner);
-      panner.connect(reverb);
-      reverb.connect(wetGain);
       wetGain.connect(audioCtx.destination);
 
       nodesRef.current = { panner, reverb, dryGain, wetGain };
