@@ -98,26 +98,29 @@ export function PlayerControls({
       source.connect(dryGain).connect(audioCtx.destination);
 
       // ----------------------------------------------------------------
-      // ВЕРИГА 2: СЛУШАЛКИ (HEADPHONES - НОВ ТУНИНГ)
+      // ВЕРИГА 2: СЛУШАЛКИ (HEADPHONES - VOCAL CLARITY TUNING)
       // ----------------------------------------------------------------
       const hpGain = audioCtx.createGain();
       hpGain.gain.value = 0; 
 
-      // Бас: Затопляне на звука
+      // 1. Бас: Леко затопляне
       const hpBass = audioCtx.createBiquadFilter();
-      hpBass.type = 'lowshelf'; hpBass.frequency.value = 100; hpBass.gain.value = 3;
+      hpBass.type = 'lowshelf'; hpBass.frequency.value = 120; hpBass.gain.value = 2.5;
 
-      // Среди: ИЗРЯЗВАНЕ на "кухия" звук, създаден от HRTF (нова стъпка!)
+      // 2. Среди: Изчистване на "мътността" (Mud), но запазване на гласа
       const hpMid = audioCtx.createBiquadFilter();
-      hpMid.type = 'peaking'; hpMid.frequency.value = 1000; hpMid.Q.value = 1; hpMid.gain.value = -3.5;
+      hpMid.type = 'peaking'; hpMid.frequency.value = 800; hpMid.Q.value = 1; hpMid.gain.value = -1.5;
 
-      // Високи: Вдигнати на 7000Hz за връщане на "въздуха" и блясъка
+      // 3. НОВО: Вокално присъствие (Vocal Clarity) - изкарва вокалите най-отпред
+      const hpPresence = audioCtx.createBiquadFilter();
+      hpPresence.type = 'peaking'; hpPresence.frequency.value = 3200; hpPresence.Q.value = 1.2; hpPresence.gain.value = 4;
+
+      // 4. Високи: Блясък и "въздух"
       const hpTreble = audioCtx.createBiquadFilter();
-      hpTreble.type = 'highshelf'; hpTreble.frequency.value = 7000; hpTreble.gain.value = 6.5;
+      hpTreble.type = 'highshelf'; hpTreble.frequency.value = 7500; hpTreble.gain.value = 4.5;
 
       const hpSplit = audioCtx.createChannelSplitter(2);
       
-      // Изнасяме колоните по-встрани (X: 2.0), за да звучи по-широко и естествено
       const hpPanL = audioCtx.createPanner();
       hpPanL.panningModel = 'HRTF'; hpPanL.positionX.value = -2.0; hpPanL.positionZ.value = -1.0;
       
@@ -126,10 +129,10 @@ export function PlayerControls({
 
       const hpRev = audioCtx.createConvolver();
       hpRev.buffer = impulseBuffer;
-      const hpRevGain = audioCtx.createGain(); hpRevGain.gain.value = 0.05; // По-малко ехо за по-фокусиран звук
+      const hpRevGain = audioCtx.createGain(); hpRevGain.gain.value = 0.05; 
 
-      // Свързване: Source -> Bass -> Mid Cut -> Treble Boost -> Splitter
-      source.connect(hpGain).connect(hpBass).connect(hpMid).connect(hpTreble);
+      // Свързване: Source -> Bass -> Mid Cut -> Vocal Presence -> Treble Boost -> Splitter
+      source.connect(hpGain).connect(hpBass).connect(hpMid).connect(hpPresence).connect(hpTreble);
       hpTreble.connect(hpSplit);
       hpSplit.connect(hpPanL, 0).connect(audioCtx.destination);
       hpSplit.connect(hpPanR, 1).connect(audioCtx.destination);
