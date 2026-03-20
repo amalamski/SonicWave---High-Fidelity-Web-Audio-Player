@@ -55,63 +55,78 @@ export function PlayerControls({
   const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
   const playbackRates = [0.5, 0.75, 1, 1.25, 1.5, 2];
 
-  // --- SPATIAL AUDIO STATE & REFS ---
   const [spatialOn, setSpatialOn] = useState(false);
   const [irLoaded, setIrLoaded] = useState(false);
   const audioCtxRef = useRef<AudioContext | null>(null);
   const nodesRef = useRef<any>({});
 
-  // --- SPATIAL AUDIO ИНИЦИАЛИЗАЦИЯ ---
+  // --- APPLE-STYLE SPATIAL AUDIO ИНИЦИАЛИЗАЦИЯ ---
   useEffect(() => {
-    // Инициализираме само ако имаме аудио елемент и все още нямаме създаден контекст
     if (audioRef.current && !audioCtxRef.current) {
       const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
       const audioCtx = new AudioContextClass();
       audioCtxRef.current = audioCtx;
 
       const source = audioCtx.createMediaElementSource(audioRef.current);
+      
+      // Нови възли за Apple-style стерео разделяне
+      const splitter = audioCtx.createChannelSplitter(2);
+      const pannerLeft = audioCtx.createPanner();
+      const pannerRight = audioCtx.createPanner();
+      
+      // EQ за възстановяване на баса (HRTF филтрите режат ниските честоти)
+      const bassEQ = audioCtx.createBiquadFilter();
+      bassEQ.type = 'lowshelf';
+      bassEQ.frequency.value = 150; // Под 150Hz
+      bassEQ.gain.value = 4; // Вдигаме баса с 4dB, за да звучи топло
+
       const reverb = audioCtx.createConvolver();
-      const panner = audioCtx.createPanner();
+      const reverbGain = audioCtx.createGain();
       const dryGain = audioCtx.createGain();
       const wetGain = audioCtx.createGain();
-      const reverbGain = audioCtx.createGain(); // Отделен контрол за силата на ехото
 
-      // Настройки на Panner
-      panner.panningModel = 'HRTF';
-      panner.distanceModel = 'inverse';
-      panner.refDistance = 1;
-      panner.maxDistance = 10000;
-      panner.rolloffFactor = 1;
-      panner.positionX.value = 0.2;
-      panner.positionY.value = 0;
-      panner.positionZ.value = -1.2;
+      // Настройки на левия виртуален говорител (Пред теб и вляво)
+      pannerLeft.panningModel = 'HRTF';
+      pannerLeft.positionX.value = -1.5;
+      pannerLeft.positionY.value = 0.2;
+      pannerLeft.positionZ.value = -1.5;
+
+      // Настройки на десния виртуален говорител (Пред теб и вдясно)
+      pannerRight.panningModel = 'HRTF';
+      pannerRight.positionX.value = 1.5;
+      pannerRight.positionY.value = 0.2;
+      pannerRight.positionZ.value = -1.5;
 
       dryGain.gain.value = 1;
       wetGain.gain.value = 0;
-      
-      // ТУК ЗАДАВАМЕ СИЛАТА НА ЕХОТО (0.15 = 15%)
-      reverbGain.gain.value = 0.15; 
+      reverbGain.gain.value = 0.08; // Много леко ехо, само за "въздух" около звука
 
-      // --- ПАРАЛЕЛНА DSP ВЕРИГА ---
+      // --- DSP ВЕРИГАТА ---
       
-      // 1. Нормален (чист) звук при изключен Spatial
+      // 1. Сух сигнал
       source.connect(dryGain).connect(audioCtx.destination);
       
-      // 2. Чист 3D звук (Panner) -> отива директно в WetGain
-      source.connect(panner);
-      panner.connect(wetGain);
+      // 2. Spatial сигнал (Apple Style)
+      source.connect(bassEQ); // Първо връщаме баса
+      bassEQ.connect(splitter); // Разделяме на ляво и дясно
       
-      // 3. Добавяме леко ехо (Reverb) паралелно
-      panner.connect(reverb);
+      splitter.connect(pannerLeft, 0); // Левият канал отива в левия говорител
+      splitter.connect(pannerRight, 1); // Десният канал отива в десния говорител
+      
+      pannerLeft.connect(wetGain);
+      pannerRight.connect(wetGain);
+      
+      // 3. Добавяме малко "стая" (вземаме от EQ-то, за да не се размазва HRTF-а)
+      bassEQ.connect(reverb);
       reverb.connect(reverbGain);
       reverbGain.connect(wetGain);
 
       wetGain.connect(audioCtx.destination);
 
-      nodesRef.current = { panner, reverb, dryGain, wetGain };
+      nodesRef.current = { pannerLeft, pannerRight, dryGain, wetGain };
 
-      // Генериране на изкуствено ехо (Synthetic Impulse Response)
-      const duration = 0.4; // дължина на ехото в секунди
+      // Генериране на по-приятно и кратко ехо
+      const duration = 0.3; // Много кратко
       const sampleRate = audioCtx.sampleRate;
       const length = sampleRate * duration;
       const impulse = audioCtx.createBuffer(2, length, sampleRate);
@@ -119,25 +134,23 @@ export function PlayerControls({
       const right = impulse.getChannelData(1);
       
       for (let i = 0; i < length; i++) {
-        // Плавно затихване на ехото
-        const factor = Math.exp(-i / (sampleRate * 0.5)); 
+        const factor = Math.exp(-i / (sampleRate * 0.3)); 
         left[i] = (Math.random() * 2 - 1) * factor;
         right[i] = (Math.random() * 2 - 1) * factor;
       }
       
       reverb.buffer = impulse;
-      setIrLoaded(true); // Веднага активираме бутона!
+      setIrLoaded(true);
     }
   }, [audioRef]);
 
   // --- SPATIAL AUDIO ПРЕВКЛЮЧВАНЕ ---
   const toggleSpatial = () => {
-    const { panner, dryGain, wetGain } = nodesRef.current;
+    const { pannerLeft, pannerRight, dryGain, wetGain } = nodesRef.current;
     const audioCtx = audioCtxRef.current;
     
-    if (!audioCtx || !panner) return; 
+    if (!audioCtx || !pannerLeft) return; 
 
-    // Ако контекстът е "спрян" заради браузър полиси, го пускаме
     if (audioCtx.state === 'suspended') {
       audioCtx.resume();
     }
@@ -153,8 +166,11 @@ export function PlayerControls({
       dryGain.gain.linearRampToValueAtTime(0, now + fadeTime);
       wetGain.gain.linearRampToValueAtTime(1, now + fadeTime);
       
-      panner.positionZ.setValueAtTime(-0.5, now);
-      panner.positionZ.linearRampToValueAtTime(-1.5, now + 0.5);
+      // Анимация: Виртуалните говорители се "отдалечават" плавно
+      pannerLeft.positionZ.setValueAtTime(-0.5, now);
+      pannerLeft.positionZ.linearRampToValueAtTime(-1.5, now + 0.5);
+      pannerRight.positionZ.setValueAtTime(-0.5, now);
+      pannerRight.positionZ.linearRampToValueAtTime(-1.5, now + 0.5);
     } else {
       dryGain.gain.linearRampToValueAtTime(1, now + fadeTime);
       wetGain.gain.linearRampToValueAtTime(0, now + fadeTime);
