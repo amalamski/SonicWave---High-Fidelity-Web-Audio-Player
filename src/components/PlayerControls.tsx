@@ -63,14 +63,12 @@ export function PlayerControls({
   const audioCtxRef = useRef<AudioContext | null>(null);
   const nodesRef = useRef<any>({});
 
-  // Автоматично събуждане на аудио контекста
   useEffect(() => {
     if (isPlaying && audioCtxRef.current && audioCtxRef.current.state === 'suspended') {
       audioCtxRef.current.resume();
     }
   }, [isPlaying]);
 
-  // --- ИЗГРАЖДАНЕ НА ТРИТЕ АУДИО ВЕРИГИ (OFF / HEADPHONES / SPEAKERS) ---
   useEffect(() => {
     if (audioRef.current && !audioCtxRef.current) {
       const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
@@ -79,7 +77,7 @@ export function PlayerControls({
 
       const source = audioCtx.createMediaElementSource(audioRef.current);
 
-      // 1. Генериране на общо ехо (Impulse Response) за стаята
+      // Генериране на импулс (стая)
       const duration = 0.4; 
       const sampleRate = audioCtx.sampleRate;
       const length = sampleRate * duration;
@@ -100,40 +98,48 @@ export function PlayerControls({
       source.connect(dryGain).connect(audioCtx.destination);
 
       // ----------------------------------------------------------------
-      // ВЕРИГА 2: СЛУШАЛКИ (HEADPHONES - HRTF 3D)
+      // ВЕРИГА 2: СЛУШАЛКИ (HEADPHONES - НОВ ТУНИНГ)
       // ----------------------------------------------------------------
       const hpGain = audioCtx.createGain();
-      hpGain.gain.value = 0; // Първоначално изключена
+      hpGain.gain.value = 0; 
 
+      // Бас: Затопляне на звука
       const hpBass = audioCtx.createBiquadFilter();
-      hpBass.type = 'lowshelf'; hpBass.frequency.value = 150; hpBass.gain.value = 4;
+      hpBass.type = 'lowshelf'; hpBass.frequency.value = 100; hpBass.gain.value = 3;
 
+      // Среди: ИЗРЯЗВАНЕ на "кухия" звук, създаден от HRTF (нова стъпка!)
+      const hpMid = audioCtx.createBiquadFilter();
+      hpMid.type = 'peaking'; hpMid.frequency.value = 1000; hpMid.Q.value = 1; hpMid.gain.value = -3.5;
+
+      // Високи: Вдигнати на 7000Hz за връщане на "въздуха" и блясъка
       const hpTreble = audioCtx.createBiquadFilter();
-      hpTreble.type = 'highshelf'; hpTreble.frequency.value = 3000; hpTreble.gain.value = 6;
+      hpTreble.type = 'highshelf'; hpTreble.frequency.value = 7000; hpTreble.gain.value = 6.5;
 
       const hpSplit = audioCtx.createChannelSplitter(2);
       
+      // Изнасяме колоните по-встрани (X: 2.0), за да звучи по-широко и естествено
       const hpPanL = audioCtx.createPanner();
-      hpPanL.panningModel = 'HRTF'; hpPanL.positionX.value = -1.5; hpPanL.positionZ.value = -1.5;
+      hpPanL.panningModel = 'HRTF'; hpPanL.positionX.value = -2.0; hpPanL.positionZ.value = -1.0;
       
       const hpPanR = audioCtx.createPanner();
-      hpPanR.panningModel = 'HRTF'; hpPanR.positionX.value = 1.5; hpPanR.positionZ.value = -1.5;
+      hpPanR.panningModel = 'HRTF'; hpPanR.positionX.value = 2.0; hpPanR.positionZ.value = -1.0;
 
       const hpRev = audioCtx.createConvolver();
       hpRev.buffer = impulseBuffer;
-      const hpRevGain = audioCtx.createGain(); hpRevGain.gain.value = 0.08;
+      const hpRevGain = audioCtx.createGain(); hpRevGain.gain.value = 0.05; // По-малко ехо за по-фокусиран звук
 
-      source.connect(hpGain).connect(hpBass).connect(hpTreble);
+      // Свързване: Source -> Bass -> Mid Cut -> Treble Boost -> Splitter
+      source.connect(hpGain).connect(hpBass).connect(hpMid).connect(hpTreble);
       hpTreble.connect(hpSplit);
       hpSplit.connect(hpPanL, 0).connect(audioCtx.destination);
       hpSplit.connect(hpPanR, 1).connect(audioCtx.destination);
       hpTreble.connect(hpRev).connect(hpRevGain).connect(audioCtx.destination);
 
       // ----------------------------------------------------------------
-      // ВЕРИГА 3: ГОВОРИТЕЛИ НА ЛАПТОП (SPEAKERS - WIDE + COMPRESSOR)
+      // ВЕРИГА 3: ГОВОРИТЕЛИ НА ЛАПТОП (SPEAKERS)
       // ----------------------------------------------------------------
       const spGain = audioCtx.createGain();
-      spGain.gain.value = 0; // Първоначално изключена
+      spGain.gain.value = 0; 
 
       const spBass = audioCtx.createBiquadFilter();
       spBass.type = 'lowshelf'; spBass.frequency.value = 200; spBass.gain.value = 5;
@@ -161,17 +167,15 @@ export function PlayerControls({
       spTreble.connect(spSplit);
       spSplit.connect(spPanL, 0).connect(spComp);
       spSplit.connect(spPanR, 1).connect(spComp);
-      spTreble.connect(spComp); // Phantom Center
+      spTreble.connect(spComp); 
       spTreble.connect(spRev).connect(spRevGain).connect(spComp);
       spComp.connect(audioCtx.destination);
 
-      // Запазваме само Gain възлите, защото те контролират силата на веригите
       nodesRef.current = { dryGain, hpGain, spGain };
       setIrLoaded(true);
     }
   }, [audioRef]);
 
-  // --- ЛОГИКА ЗА ПРЕВКЛЮЧВАНЕ НА РЕЖИМИТЕ (С ПЛАВНО ПРЕЛИВАНЕ) ---
   const handleModeChange = (newMode: SpatialMode) => {
     const { dryGain, hpGain, spGain } = nodesRef.current;
     const audioCtx = audioCtxRef.current;
@@ -185,12 +189,10 @@ export function PlayerControls({
     const now = audioCtx.currentTime;
     const fadeTime = 0.3;
 
-    // "Закотвяне" на текущите нива, за да няма пукане
     dryGain.gain.setValueAtTime(dryGain.gain.value, now);
     hpGain.gain.setValueAtTime(hpGain.gain.value, now);
     spGain.gain.setValueAtTime(spGain.gain.value, now);
 
-    // Плавно преливане към новите стойности (включваме избраното, изключваме другите)
     dryGain.gain.linearRampToValueAtTime(newMode === 'off' ? 1 : 0, now + fadeTime);
     hpGain.gain.linearRampToValueAtTime(newMode === 'headphones' ? 1 : 0, now + fadeTime);
     spGain.gain.linearRampToValueAtTime(newMode === 'speakers' ? 1 : 0, now + fadeTime);
@@ -291,7 +293,6 @@ export function PlayerControls({
         {/* Spatial Audio 3-Way Selector & Speed Container */}
         <div className="flex items-center gap-4">
           
-          {/* Spatial Mode Dropdown */}
           <div className="flex items-center gap-2 bg-gray-800 rounded-full px-3 py-1.5 shadow-md">
             <span className="text-[11px] uppercase tracking-wider text-gray-400 font-semibold">Audio:</span>
             <select
@@ -310,7 +311,6 @@ export function PlayerControls({
             </select>
           </div>
 
-          {/* Playback Speed */}
           <div className="flex items-center gap-2">
             <span className="text-xs text-gray-400">Speed:</span>
             <select
