@@ -183,4 +183,138 @@ export function App() {
               <p className="text-gray-400 mt-1">
                 {currentTrack?.artist || 'Select a track to play'}
               </p>
-              {currentTrack
+              {currentTrack?.album && (
+                <p className="text-gray-500 text-sm mt-1">{currentTrack.album}</p>
+              )}
+            </div>
+
+            {/* Player Controls */}
+            <div className="bg-gray-800/50 backdrop-blur-lg rounded-2xl p-6">
+              <PlayerControls
+                audioRef={audioRef} 
+                isPlaying={state.isPlaying}
+                isLoading={isLoading}
+                shuffle={state.shuffle}
+                repeatMode={state.repeatMode}
+                volume={state.volume}
+                isMuted={state.isMuted}
+                playbackRate={state.playbackRate}
+                currentTime={state.currentTime}
+                duration={state.duration}
+                onPlayPause={togglePlay}
+                onPrevious={previous}
+                onNext={next}
+                onShuffle={toggleShuffle}
+                onRepeat={toggleRepeat}
+                onVolumeChange={setVolume}
+                onMuteToggle={toggleMute}
+                onPlaybackRateChange={setPlaybackRate}
+                onSeek={seek}
+              />
+            </div>
+
+            {/* Equalizer Panel - Mobile */}
+            {showEqualizer && (
+              <div className="lg:hidden">
+                <Equalizer
+                  gains={equalizerGains}
+                  frequencies={FREQUENCIES}
+                  presets={EQUALIZER_PRESETS}
+                  currentPreset={currentPreset}
+                  onGainChange={setBandGain}
+                  onPresetChange={applyPreset}
+                />
+              </div>
+            )}
+          </div>
+
+          {/* Right Column - Playlist & Equalizer */}
+          <div className="space-y-6">
+            {/* Playlist */}
+            <Playlist
+              tracks={playlist}
+              currentTrackIndex={state.currentTrackIndex}
+              isPlaying={state.isPlaying}
+              onTrackSelect={playTrack}
+              onRemoveTrack={removeFromPlaylist}
+              onReorder={reorderPlaylist}
+            />
+
+            {/* File Upload */}
+            <FileUpload onFilesAdded={handleFilesAdded} />
+
+            {/* Equalizer - Desktop */}
+            {showEqualizer && (
+              <div className="hidden lg:block">
+                <Equalizer
+                  gains={equalizerGains}
+                  frequencies={FREQUENCIES}
+                  presets={EQUALIZER_PRESETS}
+                  currentPreset={currentPreset}
+                  onGainChange={setBandGain}
+                  onPresetChange={applyPreset}
+                />
+              </div>
+            )}
+          </div>
+        </div>
+      </main>
+
+      {/* Keyboard Shortcuts Modal */}
+      <ShortcutsModal
+        isOpen={showShortcuts}
+        onClose={() => setShowShortcuts(false)}
+        shortcuts={shortcuts}
+      />
+
+      {/* Footer */}
+      <footer className="text-center py-4 text-gray-500 text-sm">
+        <p>Press <kbd className="px-2 py-1 bg-gray-800 rounded text-xs">?</kbd> for keyboard shortcuts</p>
+      </footer>
+
+      <style>{`
+        .custom-scrollbar::-webkit-scrollbar {
+          width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+          background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+          background: rgba(139, 92, 246, 0.3);
+          border-radius: 3px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+          background: rgba(139, 92, 246, 0.5);
+        }
+        @keyframes pulse-subtle {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.9; }
+        }
+        .animate-pulse-subtle {
+          animation: pulse-subtle 2s ease-in-out infinite;
+        }
+        .equalizer-slider {
+          -webkit-appearance: none;
+          background: transparent;
+        }
+        .equalizer-slider::-webkit-slider-thumb {
+          -webkit-appearance: none;
+          height: 16px;
+          width: 16px;
+          border-radius: 50%;
+          background: linear-gradient(135deg, #a855f7, #ec4899);
+          cursor: pointer;
+          margin-top: -6px;
+          box-shadow: 0 2px 6px rgba(168, 85, 247, 0.5);
+        }
+        .equalizer-slider::-webkit-slider-runnable-track {
+          width: 100%;
+          height: 4px;
+          cursor: pointer;
+          background: linear-gradient(to right, #374151, #4b5563);
+          border-radius: 2px;
+        }
+      `}</style>
+    </div>
+  );
+}
