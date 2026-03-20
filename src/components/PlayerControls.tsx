@@ -60,6 +60,13 @@ export function PlayerControls({
   const audioCtxRef = useRef<AudioContext | null>(null);
   const nodesRef = useRef<any>({});
 
+  // --- АВТОМАТИЧНО СЪБУЖДАНЕ НА КОНТЕКСТА (Решава Проблем 2) ---
+  useEffect(() => {
+    if (isPlaying && audioCtxRef.current && audioCtxRef.current.state === 'suspended') {
+      audioCtxRef.current.resume();
+    }
+  }, [isPlaying]);
+
   // --- APPLE-STYLE SPATIAL AUDIO ИНИЦИАЛИЗАЦИЯ ---
   useEffect(() => {
     if (audioRef.current && !audioCtxRef.current) {
@@ -69,29 +76,32 @@ export function PlayerControls({
 
       const source = audioCtx.createMediaElementSource(audioRef.current);
       
-      // Нови възли за Apple-style стерео разделяне
       const splitter = audioCtx.createChannelSplitter(2);
       const pannerLeft = audioCtx.createPanner();
       const pannerRight = audioCtx.createPanner();
       
-      // EQ за възстановяване на баса (HRTF филтрите режат ниските честоти)
+      // EQ: Възстановяване на баса
       const bassEQ = audioCtx.createBiquadFilter();
       bassEQ.type = 'lowshelf';
-      bassEQ.frequency.value = 150; // Под 150Hz
-      bassEQ.gain.value = 4; // Вдигаме баса с 4dB, за да звучи топло
+      bassEQ.frequency.value = 150; 
+      bassEQ.gain.value = 4; 
+
+      // EQ: Възстановяване на блясъка/яснотата (Решава Проблем 1 - Глухия звук)
+      const trebleEQ = audioCtx.createBiquadFilter();
+      trebleEQ.type = 'highshelf';
+      trebleEQ.frequency.value = 3000; // Честоти над 3kHz
+      trebleEQ.gain.value = 6; // Вдигаме ги с 6 децибела, за да компенсираме HRTF заглушаването
 
       const reverb = audioCtx.createConvolver();
       const reverbGain = audioCtx.createGain();
       const dryGain = audioCtx.createGain();
       const wetGain = audioCtx.createGain();
 
-      // Настройки на левия виртуален говорител (Пред теб и вляво)
       pannerLeft.panningModel = 'HRTF';
       pannerLeft.positionX.value = -1.5;
       pannerLeft.positionY.value = 0.2;
       pannerLeft.positionZ.value = -1.5;
 
-      // Настройки на десния виртуален говорител (Пред теб и вдясно)
       pannerRight.panningModel = 'HRTF';
       pannerRight.positionX.value = 1.5;
       pannerRight.positionY.value = 0.2;
@@ -99,25 +109,26 @@ export function PlayerControls({
 
       dryGain.gain.value = 1;
       wetGain.gain.value = 0;
-      reverbGain.gain.value = 0.08; // Много леко ехо, само за "въздух" около звука
+      reverbGain.gain.value = 0.08; 
 
       // --- DSP ВЕРИГАТА ---
       
       // 1. Сух сигнал
       source.connect(dryGain).connect(audioCtx.destination);
       
-      // 2. Spatial сигнал (Apple Style)
-      source.connect(bassEQ); // Първо връщаме баса
-      bassEQ.connect(splitter); // Разделяме на ляво и дясно
+      // 2. Spatial сигнал 
+      source.connect(bassEQ);
+      bassEQ.connect(trebleEQ); // Добавяме и Treble филтъра към веригата
+      trebleEQ.connect(splitter); 
       
-      splitter.connect(pannerLeft, 0); // Левият канал отива в левия говорител
-      splitter.connect(pannerRight, 1); // Десният канал отива в десния говорител
+      splitter.connect(pannerLeft, 0); 
+      splitter.connect(pannerRight, 1); 
       
       pannerLeft.connect(wetGain);
       pannerRight.connect(wetGain);
       
-      // 3. Добавяме малко "стая" (вземаме от EQ-то, за да не се размазва HRTF-а)
-      bassEQ.connect(reverb);
+      // 3. Стая
+      trebleEQ.connect(reverb);
       reverb.connect(reverbGain);
       reverbGain.connect(wetGain);
 
@@ -125,8 +136,7 @@ export function PlayerControls({
 
       nodesRef.current = { pannerLeft, pannerRight, dryGain, wetGain };
 
-      // Генериране на по-приятно и кратко ехо
-      const duration = 0.3; // Много кратко
+      const duration = 0.3; 
       const sampleRate = audioCtx.sampleRate;
       const length = sampleRate * duration;
       const impulse = audioCtx.createBuffer(2, length, sampleRate);
@@ -166,7 +176,6 @@ export function PlayerControls({
       dryGain.gain.linearRampToValueAtTime(0, now + fadeTime);
       wetGain.gain.linearRampToValueAtTime(1, now + fadeTime);
       
-      // Анимация: Виртуалните говорители се "отдалечават" плавно
       pannerLeft.positionZ.setValueAtTime(-0.5, now);
       pannerLeft.positionZ.linearRampToValueAtTime(-1.5, now + 0.5);
       pannerRight.positionZ.setValueAtTime(-0.5, now);
