@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React from 'react';
 import { RepeatMode } from '@/types/music';
 import { cn } from '@/utils/cn';
+import { SpatialMode } from '@/hooks/useAudioEngine';
 
 interface PlayerControlsProps {
-  audioRef: React.RefObject<HTMLAudioElement>;
   isPlaying: boolean;
   isLoading: boolean;
   shuffle: boolean;
@@ -22,6 +22,10 @@ interface PlayerControlsProps {
   onMuteToggle: () => void;
   onPlaybackRateChange: (rate: number) => void;
   onSeek: (time: number) => void;
+  // Новите пропове за Spatial Audio
+  spatialMode: SpatialMode;
+  onSpatialModeChange: (mode: SpatialMode) => void;
+  isSpatialLoaded: boolean;
 }
 
 function formatTime(seconds: number): string {
@@ -31,10 +35,7 @@ function formatTime(seconds: number): string {
   return `${mins}:${secs.toString().padStart(2, '0')}`;
 }
 
-type SpatialMode = 'off' | 'headphones' | 'speakers';
-
 export function PlayerControls({
-  audioRef,
   isPlaying,
   isLoading,
   shuffle,
@@ -53,155 +54,12 @@ export function PlayerControls({
   onMuteToggle,
   onPlaybackRateChange,
   onSeek,
+  spatialMode,
+  onSpatialModeChange,
+  isSpatialLoaded,
 }: PlayerControlsProps) {
   const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
   const playbackRates = [0.5, 0.75, 1, 1.25, 1.5, 2];
-
-  const [spatialMode, setSpatialMode] = useState<SpatialMode>('off');
-  const [irLoaded, setIrLoaded] = useState(false);
-  
-  const audioCtxRef = useRef<AudioContext | null>(null);
-  const nodesRef = useRef<any>({});
-
-  useEffect(() => {
-    if (isPlaying && audioCtxRef.current && audioCtxRef.current.state === 'suspended') {
-      audioCtxRef.current.resume();
-    }
-  }, [isPlaying]);
-
-  useEffect(() => {
-    if (audioRef.current && !audioCtxRef.current) {
-      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
-      const audioCtx = new AudioContextClass();
-      audioCtxRef.current = audioCtx;
-
-      const source = audioCtx.createMediaElementSource(audioRef.current);
-
-      // Генериране на импулс (стая)
-      const duration = 0.4; 
-      const sampleRate = audioCtx.sampleRate;
-      const length = sampleRate * duration;
-      const impulseBuffer = audioCtx.createBuffer(2, length, sampleRate);
-      const left = impulseBuffer.getChannelData(0);
-      const right = impulseBuffer.getChannelData(1);
-      for (let i = 0; i < length; i++) {
-        const factor = Math.exp(-i / (sampleRate * 0.3)); 
-        left[i] = (Math.random() * 2 - 1) * factor;
-        right[i] = (Math.random() * 2 - 1) * factor;
-      }
-
-      // ----------------------------------------------------------------
-      // ВЕРИГА 1: ЧИСТ ЗВУК (OFF)
-      // ----------------------------------------------------------------
-      const dryGain = audioCtx.createGain();
-      dryGain.gain.value = 1;
-      source.connect(dryGain).connect(audioCtx.destination);
-
-      // ----------------------------------------------------------------
-      // ВЕРИГА 2: СЛУШАЛКИ (HEADPHONES - VOCAL CLARITY TUNING)
-      // ----------------------------------------------------------------
-      const hpGain = audioCtx.createGain();
-      hpGain.gain.value = 0; 
-
-      // 1. Бас: Леко затопляне
-      const hpBass = audioCtx.createBiquadFilter();
-      hpBass.type = 'lowshelf'; hpBass.frequency.value = 120; hpBass.gain.value = 2.5;
-
-      // 2. Среди: Изчистване на "мътността" (Mud), но запазване на гласа
-      const hpMid = audioCtx.createBiquadFilter();
-      hpMid.type = 'peaking'; hpMid.frequency.value = 800; hpMid.Q.value = 1; hpMid.gain.value = -1.5;
-
-      // 3. НОВО: Вокално присъствие (Vocal Clarity) - изкарва вокалите най-отпред
-      const hpPresence = audioCtx.createBiquadFilter();
-      hpPresence.type = 'peaking'; hpPresence.frequency.value = 3200; hpPresence.Q.value = 1.2; hpPresence.gain.value = 4;
-
-      // 4. Високи: Блясък и "въздух"
-      const hpTreble = audioCtx.createBiquadFilter();
-      hpTreble.type = 'highshelf'; hpTreble.frequency.value = 7500; hpTreble.gain.value = 4.5;
-
-      const hpSplit = audioCtx.createChannelSplitter(2);
-      
-      const hpPanL = audioCtx.createPanner();
-      hpPanL.panningModel = 'HRTF'; hpPanL.positionX.value = -2.0; hpPanL.positionZ.value = -1.0;
-      
-      const hpPanR = audioCtx.createPanner();
-      hpPanR.panningModel = 'HRTF'; hpPanR.positionX.value = 2.0; hpPanR.positionZ.value = -1.0;
-
-      const hpRev = audioCtx.createConvolver();
-      hpRev.buffer = impulseBuffer;
-      const hpRevGain = audioCtx.createGain(); hpRevGain.gain.value = 0.05; 
-
-      // Свързване: Source -> Bass -> Mid Cut -> Vocal Presence -> Treble Boost -> Splitter
-      source.connect(hpGain).connect(hpBass).connect(hpMid).connect(hpPresence).connect(hpTreble);
-      hpTreble.connect(hpSplit);
-      hpSplit.connect(hpPanL, 0).connect(audioCtx.destination);
-      hpSplit.connect(hpPanR, 1).connect(audioCtx.destination);
-      hpTreble.connect(hpRev).connect(hpRevGain).connect(audioCtx.destination);
-
-      // ----------------------------------------------------------------
-      // ВЕРИГА 3: ГОВОРИТЕЛИ НА ЛАПТОП (SPEAKERS)
-      // ----------------------------------------------------------------
-      const spGain = audioCtx.createGain();
-      spGain.gain.value = 0; 
-
-      const spBass = audioCtx.createBiquadFilter();
-      spBass.type = 'lowshelf'; spBass.frequency.value = 200; spBass.gain.value = 5;
-
-      const spTreble = audioCtx.createBiquadFilter();
-      spTreble.type = 'highshelf'; spTreble.frequency.value = 4000; spTreble.gain.value = 4;
-
-      const spComp = audioCtx.createDynamicsCompressor();
-      spComp.threshold.value = -24; spComp.knee.value = 30; spComp.ratio.value = 4; 
-      spComp.attack.value = 0.003; spComp.release.value = 0.25;
-
-      const spSplit = audioCtx.createChannelSplitter(2);
-      
-      const spPanL = audioCtx.createPanner();
-      spPanL.panningModel = 'equalpower'; spPanL.positionX.value = -2.5; spPanL.positionZ.value = -1.0;
-      
-      const spPanR = audioCtx.createPanner();
-      spPanR.panningModel = 'equalpower'; spPanR.positionX.value = 2.5; spPanR.positionZ.value = -1.0;
-
-      const spRev = audioCtx.createConvolver();
-      spRev.buffer = impulseBuffer;
-      const spRevGain = audioCtx.createGain(); spRevGain.gain.value = 0.12;
-
-      source.connect(spGain).connect(spBass).connect(spTreble);
-      spTreble.connect(spSplit);
-      spSplit.connect(spPanL, 0).connect(spComp);
-      spSplit.connect(spPanR, 1).connect(spComp);
-      spTreble.connect(spComp); 
-      spTreble.connect(spRev).connect(spRevGain).connect(spComp);
-      spComp.connect(audioCtx.destination);
-
-      nodesRef.current = { dryGain, hpGain, spGain };
-      setIrLoaded(true);
-    }
-  }, [audioRef]);
-
-  const handleModeChange = (newMode: SpatialMode) => {
-    const { dryGain, hpGain, spGain } = nodesRef.current;
-    const audioCtx = audioCtxRef.current;
-    
-    if (!audioCtx || !dryGain) return; 
-
-    if (audioCtx.state === 'suspended') {
-      audioCtx.resume();
-    }
-
-    const now = audioCtx.currentTime;
-    const fadeTime = 0.3;
-
-    dryGain.gain.setValueAtTime(dryGain.gain.value, now);
-    hpGain.gain.setValueAtTime(hpGain.gain.value, now);
-    spGain.gain.setValueAtTime(spGain.gain.value, now);
-
-    dryGain.gain.linearRampToValueAtTime(newMode === 'off' ? 1 : 0, now + fadeTime);
-    hpGain.gain.linearRampToValueAtTime(newMode === 'headphones' ? 1 : 0, now + fadeTime);
-    spGain.gain.linearRampToValueAtTime(newMode === 'speakers' ? 1 : 0, now + fadeTime);
-
-    setSpatialMode(newMode);
-  };
 
   return (
     <div className="space-y-4">
@@ -234,10 +92,7 @@ export function PlayerControls({
 
       {/* Main Controls */}
       <div className="flex items-center justify-center gap-4">
-        <button
-          onClick={onShuffle}
-          className={cn('p-2 rounded-full transition-colors', shuffle ? 'text-purple-400' : 'text-gray-400 hover:text-white')}
-        >
+        <button onClick={onShuffle} className={cn('p-2 rounded-full transition-colors', shuffle ? 'text-purple-400' : 'text-gray-400 hover:text-white')}>
           <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M10.59 9.17L5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41l-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z" /></svg>
         </button>
 
@@ -263,10 +118,7 @@ export function PlayerControls({
           <svg className="w-8 h-8" fill="currentColor" viewBox="0 0 24 24"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z" /></svg>
         </button>
 
-        <button
-          onClick={onRepeat}
-          className={cn('p-2 rounded-full transition-colors relative', repeatMode !== 'off' ? 'text-purple-400' : 'text-gray-400 hover:text-white')}
-        >
+        <button onClick={onRepeat} className={cn('p-2 rounded-full transition-colors relative', repeatMode !== 'off' ? 'text-purple-400' : 'text-gray-400 hover:text-white')}>
           <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z" /></svg>
           {repeatMode === 'one' && <span className="absolute -top-1 -right-1 text-[10px] bg-purple-500 text-white rounded-full w-4 h-4 flex items-center justify-center">1</span>}
         </button>
@@ -299,18 +151,18 @@ export function PlayerControls({
           <div className="flex items-center gap-2 bg-gray-800 rounded-full px-3 py-1.5 shadow-md">
             <span className="text-[11px] uppercase tracking-wider text-gray-400 font-semibold">Audio:</span>
             <select
-              disabled={!irLoaded}
+              disabled={!isSpatialLoaded}
               value={spatialMode}
-              onChange={(e) => handleModeChange(e.target.value as SpatialMode)}
+              onChange={(e) => onSpatialModeChange(e.target.value as SpatialMode)}
               className={cn(
                 "text-xs bg-transparent focus:outline-none cursor-pointer font-medium transition-colors",
-                !irLoaded ? "text-gray-500" :
+                !isSpatialLoaded ? "text-gray-500" :
                 spatialMode !== 'off' ? "text-purple-400" : "text-gray-300"
               )}
             >
-              <option value="off" className="bg-gray-800 text-white">{!irLoaded ? 'Loading...' : 'Normal (Off)'}</option>
-              {irLoaded && <option value="headphones" className="bg-gray-800 text-white">🎧 Headphones</option>}
-              {irLoaded && <option value="speakers" className="bg-gray-800 text-white">💻 Speakers</option>}
+              <option value="off" className="bg-gray-800 text-white">{!isSpatialLoaded ? 'Loading...' : 'Normal (Off)'}</option>
+              {isSpatialLoaded && <option value="headphones" className="bg-gray-800 text-white">🎧 Headphones</option>}
+              {isSpatialLoaded && <option value="speakers" className="bg-gray-800 text-white">💻 Speakers</option>}
             </select>
           </div>
 

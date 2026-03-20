@@ -50,6 +50,9 @@ export function App() {
     currentPreset,
     EQUALIZER_PRESETS,
     FREQUENCIES,
+    spatialMode,
+    changeSpatialMode,
+    irLoaded,
   } = useAudioEngine();
 
   useEffect(() => {
@@ -191,26 +194,29 @@ export function App() {
             {/* Player Controls */}
             <div className="bg-gray-800/50 backdrop-blur-lg rounded-2xl p-6">
               <PlayerControls
-                audioRef={audioRef} 
-                isPlaying={state.isPlaying}
-                isLoading={isLoading}
-                shuffle={state.shuffle}
-                repeatMode={state.repeatMode}
-                volume={state.volume}
-                isMuted={state.isMuted}
-                playbackRate={state.playbackRate}
-                currentTime={state.currentTime}
-                duration={state.duration}
-                onPlayPause={togglePlay}
-                onPrevious={previous}
-                onNext={next}
-                onShuffle={toggleShuffle}
-                onRepeat={toggleRepeat}
-                onVolumeChange={setVolume}
-                onMuteToggle={toggleMute}
-                onPlaybackRateChange={setPlaybackRate}
-                onSeek={seek}
-              />
+              isPlaying={state.isPlaying}
+              isLoading={isLoading}
+              shuffle={state.shuffle}
+              repeatMode={state.repeatMode}
+              volume={state.volume}
+              isMuted={state.isMuted}
+              playbackRate={state.playbackRate}
+              currentTime={state.currentTime}
+              duration={state.duration}
+              onPlayPause={togglePlay}
+              onPrevious={previous}
+              onNext={next}
+              onShuffle={toggleShuffle}
+              onRepeat={toggleRepeat}
+              onVolumeChange={setVolume}
+              onMuteToggle={toggleMute}
+              onPlaybackRateChange={setPlaybackRate}
+              onSeek={seek}
+              // ДОБАВИ ТЕЗИ 3 РЕДА (и премахни audioRef ако е там):
+              spatialMode={spatialMode}
+              onSpatialModeChange={changeSpatialMode}
+              isSpatialLoaded={irLoaded}
+            />
             </div>
 
             {/* Equalizer Panel - Mobile */}
