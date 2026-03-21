@@ -14,6 +14,7 @@ export function App() {
   const [showEqualizer, setShowEqualizer] = useState(false);
   const [showShortcuts, setShowShortcuts] = useState(false);
 
+  // Гетваме всичко от Music Player-а точно както беше
   const {
     audioRef,
     playlist,
@@ -39,6 +40,7 @@ export function App() {
     handleLoadStart,
   } = useMusicPlayer();
 
+  // Гетваме всичко от Audio Engine-а
   const {
     analyserRef,
     connectAudioElement,
@@ -53,7 +55,7 @@ export function App() {
     isSpatialLoaded,
   } = useAudioEngine();
 
-  // ТОЗИ ФИКС: Свързваме аудиото, за да изчезне "Loading..." при пускане на песен
+  // ЕДИНСТВЕНАТА ДОБАВКА: Обединяваме метаданните със свързването на аудиото
   const onLoadedMetadata = useCallback(() => {
     handleLoadedMetadata();
     if (audioRef.current) {
@@ -78,7 +80,7 @@ export function App() {
     <div className="min-h-screen bg-gray-950 text-gray-100 flex flex-col font-sans selection:bg-purple-500/30">
       <main className="flex-1 flex flex-col lg:flex-row p-4 lg:p-8 gap-8 max-w-7xl mx-auto w-full overflow-hidden">
         
-        {/* ЛЯВА СЕКЦИЯ (Плеър и Визуализация) */}
+        {/* ЛЯВА СЕКЦИЯ: Трак, Арт и Визуализация */}
         <div className="flex-1 flex flex-col gap-6 min-w-0">
           <div className="flex items-center justify-between">
             <div>
@@ -134,7 +136,7 @@ export function App() {
           )}
         </div>
 
-        {/* ДЯСНА СЕКЦИЯ (Качване и Плейлист) */}
+        {/* ДЯСНА СЕКЦИЯ: Качване и Плейлист (ТОЧНО ТУК БЕШЕ ГРЕШКАТА ПРЕДИ) */}
         <div className="lg:w-80 flex flex-col gap-6 h-[500px] lg:h-auto">
           <FileUpload onUpload={addToPlaylist} />
           <Playlist
@@ -148,7 +150,7 @@ export function App() {
         </div>
       </main>
 
-      {/* ФУТЪР (Контроли) */}
+      {/* ФУТЪР: Контроли за управление */}
       <footer className="bg-gray-900/50 backdrop-blur-xl border-t border-white/5 p-4 lg:p-6 sticky bottom-0 z-50">
         <div className="max-w-7xl mx-auto">
           <PlayerControls
@@ -177,6 +179,7 @@ export function App() {
         </div>
       </footer>
 
+      {/* АУДИО ТАГ */}
       <audio
         ref={audioRef}
         onTimeUpdate={handleTimeUpdate}
@@ -187,19 +190,41 @@ export function App() {
 
       {showShortcuts && <ShortcutsModal onClose={() => setShowShortcuts(false)} />}
 
+      {/* ТВОИТЕ ОРИГИНАЛНИ СТИЛОВЕ */}
       <style>{`
-        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
-        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(139, 92, 246, 0.3); border-radius: 3px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(139, 92, 246, 0.5); }
-        .equalizer-slider { -webkit-appearance: none; background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar {
+          width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+          background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+          background: rgba(139, 92, 246, 0.3);
+          border-radius: 3px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+          background: rgba(139, 92, 246, 0.5);
+        }
+        .equalizer-slider {
+          -webkit-appearance: none;
+          background: transparent;
+        }
         .equalizer-slider::-webkit-slider-thumb {
-          -webkit-appearance: none; height: 16px; width: 16px; border-radius: 50%;
-          background: linear-gradient(135deg, #a855f7, #ec4899); cursor: pointer;
-          margin-top: -6px; box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+          -webkit-appearance: none;
+          height: 16px;
+          width: 16px;
+          border-radius: 50%;
+          background: linear-gradient(135deg, #a855f7, #ec4899);
+          cursor: pointer;
+          margin-top: -6px;
+          box-shadow: 0 2px 4px rgba(0,0,0,0.3);
         }
         .equalizer-slider::-webkit-slider-runnable-track {
-          width: 100%; height: 4px; cursor: pointer; background: rgba(255,255,255,0.1); border-radius: 2px;
+          width: 100%;
+          height: 4px;
+          cursor: pointer;
+          background: rgba(255,255,255,0.1);
+          border-radius: 2px;
         }
       `}</style>
     </div>
