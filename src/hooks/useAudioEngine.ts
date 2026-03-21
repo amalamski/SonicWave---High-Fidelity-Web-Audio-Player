@@ -1,13 +1,18 @@
 import { useRef, useCallback, useState } from 'react';
 import { EqualizerPreset } from '@/types/music';
 
-export type SpatialMode = 'off' | 'headphones' | 'speakers'; // Само тези три режима
+export type SpatialMode = 'off' | 'headphones' | 'speakers';
 
 const FREQUENCIES = [32, 64, 125, 250, 500, 1000, 2000, 4000, 8000, 16000];
 
+export const EQUALIZER_PRESETS: EqualizerPreset[] = [
+  { name: 'Flat', gains: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0] },
+  { name: 'Bass Boost', gains: [8, 6, 4, 2, 0, 0, 0, 0, 0, 0] },
+];
+
 export function useAudioEngine() {
   const audioContextRef = useRef<AudioContext | null>(null);
-  const sourceRef = useRef<MediaElementSourceNode | null>(null);
+  const sourceRef = useRef<MediaElementAudioSourceNode | null>(null);
   const gainNodeRef = useRef<GainNode | null>(null);
   const equalizerBandsRef = useRef<BiquadFilterNode[]>([]);
   const hpGainRef = useRef<GainNode | null>(null);
@@ -15,7 +20,7 @@ export function useAudioEngine() {
   const analyserRef = useRef<AnalyserNode | null>(null);
   
   const [spatialMode, setSpatialMode] = useState<SpatialMode>('off');
-  const [isSpatialLoaded, setIsSpatialLoaded] = useState(false);
+  const [isSpatialLoaded, setIsSpatialLoaded] = useState(true); // Активирано по подразбиране
   const [equalizerGains, setEqualizerGains] = useState<number[]>(new Array(10).fill(0));
   const [currentPreset, setCurrentPreset] = useState('Flat');
 
@@ -54,15 +59,16 @@ export function useAudioEngine() {
     spGainRef.current = spGain;
     
     gainNode.connect(analyser);
-    setIsSpatialLoaded(true); // Активира бутоните
   }, []);
 
-  const connectAudioElement = useCallback((audio: HTMLSourceElement | HTMLAudioElement) => {
+  const connectAudioElement = useCallback((audio: HTMLAudioElement) => {
     if (!audioContextRef.current) initAudioContext();
     if (sourceRef.current) return;
-    const source = audioContextRef.current!.createMediaElementSource(audio as HTMLAudioElement);
-    source.connect(gainNodeRef.current!);
-    sourceRef.current = source;
+    try {
+      const source = audioContextRef.current!.createMediaElementSource(audio);
+      source.connect(gainNodeRef.current!);
+      sourceRef.current = source;
+    } catch (e) { console.error(e); }
   }, [initAudioContext]);
 
   const changeSpatialMode = useCallback((newMode: SpatialMode) => {
@@ -85,17 +91,13 @@ export function useAudioEngine() {
     }
   }, []);
 
-  // Провери само края на файла useAudioEngine.ts:
-return {
-  analyserRef,
-  connectAudioElement,
-  setBandGain,
-  equalizerGains,
-  currentPreset,
-  spatialMode,
-  changeSpatialMode,
-  isSpatialLoaded, // Трябва да е ТУК
-  FREQUENCIES,
-  EQUALIZER_PRESETS,
-  applyPreset: (p: any) => p.gains.forEach((g: any, i: any) => setBandGain(i, g))
-};
+  return {
+    analyserRef, connectAudioElement, setBandGain, equalizerGains,
+    currentPreset, spatialMode, changeSpatialMode, isSpatialLoaded,
+    FREQUENCIES, EQUALIZER_PRESETS,
+    applyPreset: (preset: any) => {
+      preset.gains.forEach((g: number, i: number) => setBandGain(i, g));
+      setCurrentPreset(preset.name);
+    }
+  };
+}

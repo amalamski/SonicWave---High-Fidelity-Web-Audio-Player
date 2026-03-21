@@ -1,86 +1,66 @@
-import { useState, useCallback } from 'react';
-import { useMusicPlayer } from '@/hooks/useMusicPlayer';
-import { useAudioEngine } from '@/hooks/useAudioEngine';
-import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
-import { AlbumArt } from '@/components/AlbumArt';
-import { PlayerControls } from '@/components/PlayerControls';
-import { Playlist } from '@/components/Playlist';
-import { Equalizer } from '@/components/Equalizer';
-import { AudioVisualizer } from '@/components/AudioVisualizer';
-import { FileUpload } from '@/components/FileUpload';
-import { ShortcutsModal } from '@/components/ShortcutsModal';
+import React from 'react';
+import { RepeatMode } from '@/types/music';
+import { cn } from '@/utils/cn';
+import { SpatialMode } from '@/hooks/useAudioEngine';
 
-export function App() {
-  const [showEqualizer, setShowEqualizer] = useState(false);
-  const [showShortcuts, setShowShortcuts] = useState(false);
+interface PlayerControlsProps {
+  isPlaying: boolean; isLoading: boolean; shuffle: boolean; repeatMode: RepeatMode;
+  volume: number; isMuted: boolean; playbackRate: number; currentTime: number; duration: number;
+  onPlayPause: () => void; onPrevious: () => void; onNext: () => void; onShuffle: () => void;
+  onRepeat: () => void; onVolumeChange: (volume: number) => void; onMuteToggle: () => void;
+  onPlaybackRateChange: (rate: number) => void; onSeek: (time: number) => void;
+  spatialMode: SpatialMode; onSpatialModeChange: (mode: SpatialMode) => void; isSpatialLoaded: boolean;
+}
 
-  const {
-    audioRef, playlist, state, currentTrack, isLoading,
-    togglePlay, next, previous, seek, setVolume, toggleMute,
-    setPlaybackRate, toggleShuffle, toggleRepeat, playTrack,
-    addToPlaylist, removeFromPlaylist, reorderPlaylist,
-    handleTimeUpdate, handleLoadedMetadata, handleEnded, handleLoadStart,
-  } = useMusicPlayer();
+const formatTime = (s: number) => {
+  if (isNaN(s) || !isFinite(s)) return '0:00';
+  const mins = Math.floor(s / 60);
+  const secs = Math.floor(s % 60);
+  return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+};
 
-  const {
-    analyserRef, connectAudioElement, setBandGain, applyPreset,
-    equalizerGains, currentPreset, EQUALIZER_PRESETS, FREQUENCIES,
-    spatialMode, changeSpatialMode, isSpatialLoaded,
-  } = useAudioEngine();
-
-  const onLoadedMetadata = useCallback(() => {
-    handleLoadedMetadata();
-    if (audioRef.current) {
-      connectAudioElement(audioRef.current);
-    }
-  }, [handleLoadedMetadata, connectAudioElement, audioRef]);
-
-  useKeyboardShortcuts({
-    onPlayPause: togglePlay, onNext: next, onPrevious: previous,
-    onVolumeUp: () => setVolume(Math.min(1, state.volume + 0.1)),
-    onVolumeDown: () => setVolume(Math.max(0, state.volume - 0.1)),
-    onMute: toggleMute, onSeekForward: () => seek(Math.min(state.duration, state.currentTime + 5)),
-    onSeekBackward: () => seek(Math.max(0, state.currentTime - 5)),
-    onToggleShuffle: toggleShuffle, onToggleRepeat: toggleRepeat,
-  });
-
+export function PlayerControls({
+  isPlaying, isLoading, shuffle, repeatMode, volume, isMuted, playbackRate, currentTime, duration,
+  onPlayPause, onPrevious, onNext, onShuffle, onRepeat, onVolumeChange, onMuteToggle, onPlaybackRateChange,
+  onSeek, spatialMode, onSpatialModeChange, isSpatialLoaded
+}: PlayerControlsProps) {
+  
   return (
-    <div className="min-h-screen bg-gray-950 text-gray-100 flex flex-col font-sans">
-      <main className="flex-1 flex flex-col lg:flex-row p-4 lg:p-8 gap-8 max-w-7xl mx-auto w-full overflow-hidden">
-        
-        {/* ЛЯВО: Плеър */}
-        <div className="flex-1 flex flex-col gap-6 min-w-0">
-          <div className="flex items-center justify-between">
-            <h1 className="text-2xl font-bold bg-gradient-to-r from-purple-400 to-pink-500 bg-clip-text text-transparent">SonicStream</h1>
-            <button onClick={() => setShowEqualizer(!showEqualizer)} className={`p-2 rounded-full ${showEqualizer ? 'bg-purple-600' : 'bg-gray-800'}`}>EQ</button>
-          </div>
-          <div className="relative aspect-video bg-gray-900 rounded-3xl overflow-hidden shadow-2xl">
-            <AlbumArt currentTrack={currentTrack} isPlaying={state.isPlaying} />
-            <div className="absolute bottom-0 left-0 right-0 p-8"><AudioVisualizer analyserRef={analyserRef} isPlaying={state.isPlaying} /></div>
-          </div>
-          <div className="space-y-1">
-            <h2 className="text-2xl font-bold truncate">{currentTrack?.title || 'No track'}</h2>
-            <p className="text-purple-400 font-medium">{currentTrack?.artist || 'Upload music'}</p>
-          </div>
-          {showEqualizer && <Equalizer frequencies={FREQUENCIES} gains={equalizerGains} setGain={setBandGain} presets={EQUALIZER_PRESETS} onApplyPreset={applyPreset} currentPreset={currentPreset} />}
+    <div className="flex flex-col gap-4">
+      <div className="flex items-center gap-3">
+        <span className="text-xs text-gray-400 font-mono w-10 text-right">{formatTime(currentTime)}</span>
+        <input type="range" min={0} max={duration || 0} value={currentTime} step={0.1} onChange={(e) => onSeek(parseFloat(e.target.value))} className="flex-1 h-1 appearance-none bg-gray-700 rounded-full cursor-pointer" />
+        <span className="text-xs text-gray-400 font-mono w-10">{formatTime(duration)}</span>
+      </div>
+
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <button onClick={onShuffle} className={cn("text-lg", shuffle ? "text-purple-400" : "text-gray-400")}>🔀</button>
+          <button onClick={onPrevious} className="text-lg text-gray-400 hover:text-white">⏮</button>
         </div>
 
-        {/* ДЯСНО: Плейлист и Качване */}
-        <div className="lg:w-80 flex flex-col gap-6">
-          <FileUpload onUpload={addToPlaylist} />
-          <Playlist tracks={playlist} currentTrackId={currentTrack?.id} isPlaying={state.isPlaying} onTrackSelect={playTrack} onRemoveTrack={removeFromPlaylist} onReorder={reorderPlaylist} />
+        <button onClick={onPlayPause} disabled={isLoading} className="w-12 h-12 flex items-center justify-center bg-gradient-to-br from-purple-500 to-pink-500 text-white rounded-full shadow-lg hover:scale-105 transition-all">
+          {isLoading ? "..." : isPlaying ? "⏸" : "▶"}
+        </button>
+
+        <div className="flex items-center gap-6">
+          <button onClick={onNext} className="text-lg text-gray-400 hover:text-white">⏭</button>
+          <button onClick={onRepeat} className={cn("text-lg", repeatMode !== 'none' ? "text-purple-400" : "text-gray-400")}>🔁</button>
+          
+          <div className="flex items-center gap-2 border-l border-gray-800 pl-4">
+            <span className="text-xs text-gray-500">Spatial:</span>
+            <select
+              value={spatialMode}
+              onChange={(e) => onSpatialModeChange(e.target.value as SpatialMode)}
+              className="text-xs bg-transparent focus:outline-none cursor-pointer text-purple-400"
+            >
+              <option value="off" className="bg-gray-900">Normal</option>
+              <option value="headphones" className="bg-gray-900">🎧 Headphones</option>
+              <option value="speakers" className="bg-gray-900">💻 Speakers</option>
+            </select>
+          </div>
         </div>
-      </main>
-
-      <footer className="bg-gray-900/80 backdrop-blur-xl border-t border-white/5 p-6 sticky bottom-0">
-        <PlayerControls
-          isPlaying={state.isPlaying} isLoading={isLoading} shuffle={state.shuffle} repeatMode={state.repeatMode} volume={state.volume} isMuted={state.isMuted} playbackRate={state.playbackRate} currentTime={state.currentTime} duration={state.duration}
-          onPlayPause={togglePlay} onPrevious={previous} onNext={next} onShuffle={toggleShuffle} onRepeat={toggleRepeat} onVolumeChange={setVolume} onMuteToggle={toggleMute} onPlaybackRateChange={setPlaybackRate} onSeek={seek}
-          spatialMode={spatialMode} onSpatialModeChange={changeSpatialMode} isSpatialLoaded={isSpatialLoaded}
-        />
-      </footer>
-
-      <audio ref={audioRef} onTimeUpdate={handleTimeUpdate} onLoadedMetadata={onLoadedMetadata} onEnded={handleEnded} onLoadStart={handleLoadStart} />
+      </div>
     </div>
   );
 }
