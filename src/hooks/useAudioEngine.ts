@@ -1,14 +1,13 @@
 import { useRef, useCallback, useState } from 'react';
 import { EqualizerPreset } from '@/types/music';
 
-export type SpatialMode = 'off' | 'headphones' | 'speakers'; // Само тези три режима
+export type SpatialMode = 'off' | 'headphones' | 'speakers';
 
 const FREQUENCIES = [32, 64, 125, 250, 500, 1000, 2000, 4000, 8000, 16000];
 
 export const EQUALIZER_PRESETS: EqualizerPreset[] = [
   { name: 'Flat', gains: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0] },
   { name: 'Bass Boost', gains: [8, 6, 4, 2, 0, 0, 0, 0, 0, 0] },
-  { name: 'Treble Boost', gains: [0, 0, 0, 0, 0, 2, 4, 6, 8, 10] },
 ];
 
 export function useAudioEngine() {
@@ -30,8 +29,7 @@ export function useAudioEngine() {
     const context = new (window.AudioContext || (window as any).webkitAudioContext)();
     const gainNode = context.createGain();
     const analyser = context.createAnalyser();
-    analyser.fftSize = 256;
-
+    
     let lastNode: AudioNode = gainNode;
     FREQUENCIES.forEach((freq) => {
       const filter = context.createBiquadFilter();
@@ -93,14 +91,13 @@ export function useAudioEngine() {
     }
   }, []);
 
-  const applyPreset = useCallback((preset: EqualizerPreset) => {
-    preset.gains.forEach((g, i) => setBandGain(i, g));
-    setCurrentPreset(preset.name);
-  }, [setBandGain]);
-
   return {
-    analyserRef, connectAudioElement, setBandGain, applyPreset,
-    equalizerGains, currentPreset, spatialMode, changeSpatialMode,
-    isSpatialLoaded, FREQUENCIES, EQUALIZER_PRESETS
+    analyserRef, connectAudioElement, setBandGain, equalizerGains,
+    currentPreset, spatialMode, changeSpatialMode, isSpatialLoaded,
+    FREQUENCIES, EQUALIZER_PRESETS,
+    applyPreset: (preset: any) => {
+      preset.gains.forEach((g: number, i: number) => setBandGain(i, g));
+      setCurrentPreset(preset.name);
+    }
   };
 }

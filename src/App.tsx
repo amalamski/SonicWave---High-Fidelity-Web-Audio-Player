@@ -47,6 +47,8 @@ export function App() {
   return (
     <div className="min-h-screen bg-gray-950 text-gray-100 flex flex-col font-sans selection:bg-purple-500/30">
       <main className="flex-1 flex flex-col lg:flex-row p-4 lg:p-8 gap-8 max-w-7xl mx-auto w-full overflow-hidden">
+        
+        {/* ЛЯВА СЕКЦИЯ: Трак и Визуализация */}
         <div className="flex-1 flex flex-col gap-6 min-w-0">
           <div className="flex items-center justify-between">
             <div>
@@ -62,25 +64,34 @@ export function App() {
               </button>
             </div>
           </div>
+
           <div className="relative group aspect-square lg:aspect-video bg-gray-900 rounded-3xl overflow-hidden shadow-2xl border border-white/5">
             <AlbumArt currentTrack={currentTrack} isPlaying={state.isPlaying} />
-            <div className="absolute bottom-0 left-0 right-0 p-8"><AudioVisualizer analyserRef={analyserRef} isPlaying={state.isPlaying} /></div>
+            <div className="absolute inset-0 bg-gradient-to-t from-gray-950/80 via-transparent to-transparent opacity-60" />
+            <div className="absolute bottom-0 left-0 right-0 p-8">
+              <AudioVisualizer analyserRef={analyserRef} isPlaying={state.isPlaying} />
+            </div>
           </div>
+
           <div className="space-y-1">
             <h2 className="text-2xl font-bold truncate">{currentTrack?.title}</h2>
             <p className="text-purple-400 font-medium">{currentTrack?.artist}</p>
           </div>
+
           {showEqualizer && (
             <div className="animate-in fade-in slide-in-from-top-4 duration-300">
               <Equalizer frequencies={FREQUENCIES} gains={equalizerGains} setGain={setBandGain} presets={EQUALIZER_PRESETS} onApplyPreset={applyPreset} currentPreset={currentPreset} />
             </div>
           )}
         </div>
+
+        {/* ДЯСНА СЕКЦИЯ: Качване и Плейлист (ТВОЯТА ВИЗИЯ) */}
         <div className="lg:w-80 flex flex-col gap-6 h-[500px] lg:h-auto overflow-hidden">
           <FileUpload onUpload={addToPlaylist} />
           <Playlist tracks={playlist} currentTrackId={currentTrack?.id} isPlaying={state.isPlaying} onTrackSelect={playTrack} onRemoveTrack={removeFromPlaylist} onReorder={reorderPlaylist} />
         </div>
       </main>
+
       <footer className="bg-gray-900/50 backdrop-blur-xl border-t border-white/5 p-4 lg:p-6 sticky bottom-0 z-50">
         <div className="max-w-7xl mx-auto">
           <PlayerControls
@@ -90,8 +101,10 @@ export function App() {
           />
         </div>
       </footer>
+
       <audio ref={audioRef} onTimeUpdate={handleTimeUpdate} onLoadedMetadata={onLoadedMetadata} onEnded={handleEnded} onLoadStart={handleLoadStart} />
       {showShortcuts && <ShortcutsModal onClose={() => setShowShortcuts(false)} />}
+      
       <style>{`
         .custom-scrollbar::-webkit-scrollbar { width: 6px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
