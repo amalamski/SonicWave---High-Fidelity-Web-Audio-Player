@@ -35,7 +35,7 @@ export function useAudioEngine() {
   const [equalizerGains, setEqualizerGains] = useState<number[]>(new Array(10).fill(0));
   const [currentPreset, setCurrentPreset] = useState<string>('Flat');
   const [spatialMode, setSpatialMode] = useState<SpatialMode>('off');
-  const [isSpatialLoaded, setIsSpatialLoaded] = useState(false);
+  const [isSpatialLoaded, setIsSpatialLoaded] = useState(true);
 
   const initAudioContext = useCallback(() => {
     if (audioContextRef.current) return;

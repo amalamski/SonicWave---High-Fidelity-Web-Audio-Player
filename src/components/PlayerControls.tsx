@@ -163,6 +163,7 @@ export function PlayerControls({
               <option value="off" className="bg-gray-800 text-white">{!isSpatialLoaded ? 'Loading...' : 'Normal (Off)'}</option>
               {isSpatialLoaded && <option value="headphones" className="bg-gray-800 text-white">🎧 Headphones</option>}
               {isSpatialLoaded && <option value="speakers" className="bg-gray-800 text-white">💻 Speakers</option>}
+              {isSpatialLoaded && <option value="atmos" className="bg-gray-800 text-white">✨ Dolby Atmos (Sim)</option>}
             </select>
           </div>
 
