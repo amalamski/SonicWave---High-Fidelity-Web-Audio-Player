@@ -14,6 +14,7 @@ export function App() {
   const [showEqualizer, setShowEqualizer] = useState(false);
   const [showShortcuts, setShowShortcuts] = useState(false);
 
+  // 1. Деструктурираме всички функции (включително addToPlaylist за качването)
   const {
     audioRef,
     playlist,
@@ -39,6 +40,7 @@ export function App() {
     handleLoadStart,
   } = useMusicPlayer();
 
+  // 2. Вземаме Spatial логиката (вече без Atmos)
   const {
     analyserRef,
     connectAudioElement,
@@ -53,6 +55,7 @@ export function App() {
     isSpatialLoaded,
   } = useAudioEngine();
 
+  // ФИКС: Свързваме аудиото при зареждане. Това ще махне "Loading..." от бутона Spatial.
   const onLoadedMetadata = useCallback(() => {
     handleLoadedMetadata();
     if (audioRef.current) {
@@ -77,7 +80,7 @@ export function App() {
     <div className="min-h-screen bg-gray-950 text-gray-100 flex flex-col font-sans selection:bg-purple-500/30">
       <main className="flex-1 flex flex-col lg:flex-row p-4 lg:p-8 gap-8 max-w-7xl mx-auto w-full overflow-hidden">
         
-        {/* ЛЯВА СТРАНА: Основен интерфейс */}
+        {/* ЛЯВА СЕКЦИЯ: Трак и Визуализация */}
         <div className="flex-1 flex flex-col gap-6 min-w-0">
           <div className="flex items-center justify-between">
             <div>
@@ -89,7 +92,7 @@ export function App() {
             <div className="flex gap-2">
               <button
                 onClick={() => setShowShortcuts(true)}
-                className="p-2 hover:bg-gray-800 rounded-full transition-colors text-gray-400 hover:text-white"
+                className="p-2 hover:bg-gray-800 rounded-full transition-colors text-gray-400"
               >
                 <kbd className="text-xs border border-gray-600 px-1.5 py-0.5 rounded">?</kbd>
               </button>
@@ -113,8 +116,8 @@ export function App() {
           </div>
 
           <div className="space-y-1">
-            <h2 className="text-2xl font-bold truncate">{currentTrack?.title || 'No track selected'}</h2>
-            <p className="text-purple-400 font-medium">{currentTrack?.artist || 'Upload music to begin'}</p>
+            <h2 className="text-2xl font-bold truncate">{currentTrack?.title || 'No Track Loaded'}</h2>
+            <p className="text-purple-400 font-medium">{currentTrack?.artist || 'Upload to start'}</p>
           </div>
 
           {showEqualizer && (
@@ -131,7 +134,7 @@ export function App() {
           )}
         </div>
 
-        {/* ДЯСНА СТРАНА: Качване и Плейлист */}
+        {/* ДЯСНА СЕКЦИЯ: Качване и Плейлист (Твоята визия) */}
         <div className="lg:w-80 flex flex-col gap-6 h-[500px] lg:h-auto overflow-hidden">
           <FileUpload onUpload={addToPlaylist} />
           <Playlist
@@ -147,4 +150,54 @@ export function App() {
 
       <footer className="bg-gray-900/50 backdrop-blur-xl border-t border-white/5 p-4 lg:p-6 sticky bottom-0 z-50">
         <div className="max-w-7xl mx-auto">
-          <Player
+          <PlayerControls
+            isPlaying={state.isPlaying}
+            isLoading={isLoading}
+            shuffle={state.shuffle}
+            repeatMode={state.repeatMode}
+            volume={state.volume}
+            isMuted={state.isMuted}
+            playbackRate={state.playbackRate}
+            currentTime={state.currentTime}
+            duration={state.duration}
+            onPlayPause={togglePlay}
+            onPrevious={previous}
+            onNext={next}
+            onShuffle={toggleShuffle}
+            onRepeat={toggleRepeat}
+            onVolumeChange={setVolume}
+            onMuteToggle={toggleMute}
+            onPlaybackRateChange={setPlaybackRate}
+            onSeek={seek}
+            spatialMode={spatialMode}
+            onSpatialModeChange={changeSpatialMode}
+            isSpatialLoaded={isSpatialLoaded}
+          />
+        </div>
+      </footer>
+
+      <audio
+        ref={audioRef}
+        onTimeUpdate={handleTimeUpdate}
+        onLoadedMetadata={onLoadedMetadata}
+        onEnded={handleEnded}
+        onLoadStart={handleLoadStart}
+      />
+
+      {showShortcuts && <ShortcutsModal onClose={() => setShowShortcuts(false)} />}
+
+      <style>{`
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(139, 92, 246, 0.3); border-radius: 3px; }
+        .equalizer-slider::-webkit-slider-thumb {
+          -webkit-appearance: none; height: 16px; width: 16px; border-radius: 50%;
+          background: linear-gradient(135deg, #a855f7, #ec4899); cursor: pointer; margin-top: -6px;
+        }
+        .equalizer-slider::-webkit-slider-runnable-track {
+          width: 100%; height: 4px; cursor: pointer; background: rgba(255,255,255,0.1); border-radius: 2px;
+        }
+      `}</style>
+    </div>
+  );
+}
