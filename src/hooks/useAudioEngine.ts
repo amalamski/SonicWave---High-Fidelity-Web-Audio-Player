@@ -64,7 +64,7 @@ export function useAudioEngine() {
     });
     lastNode.connect(analyser);
 
-    // --- IR GENERATION ---
+    // --- IR GENERATION (Rich Studio Response) ---
     const duration = 0.6; 
     const sampleRate = audioContext.sampleRate;
     const length = sampleRate * duration;
@@ -77,66 +77,51 @@ export function useAudioEngine() {
       right[i] = (Math.random() * 2 - 1) * factor;
     }
 
-    // --- 1. DRY CHAIN ---
     const dryGain = audioContext.createGain();
     dryGain.gain.value = 1;
     analyser.connect(dryGain).connect(audioContext.destination);
     dryGainRef.current = dryGain;
 
-    // --- 2. HARMAN-TUNED HEADPHONES CHAIN ---
+    // --- 2. HEADPHONES MODE (HARMAN + VOCAL SOUL) ---
     const hpGain = audioContext.createGain();
     hpGain.gain.value = 0; 
-    
-    // Harman Step 1: Sub-Bass Rise (симулира усещане на тялото)
-    const hpSubBass = audioContext.createBiquadFilter();
-    hpSubBass.type = 'lowshelf'; hpSubBass.frequency.value = 105; hpSubBass.gain.value = 5.5;
-
-    // Harman Step 2: Ear Canal Resonance (Pinna gain на 3kHz)
-    const hpPinna = audioContext.createBiquadFilter();
-    hpPinna.type = 'peaking'; hpPinna.frequency.value = 3000; hpPinna.Q.value = 1.2; hpPinna.gain.value = 6;
-
-    // Harman Step 3: Clarity/Air (High shelf за детайл)
-    const hpAir = audioContext.createBiquadFilter();
-    hpAir.type = 'highshelf'; hpAir.frequency.value = 11000; hpAir.gain.value = 2.5;
-
-    // Vocal Mid-Clarity (вашата любима част за вокалите)
-    const hpVocalMid = audioContext.createBiquadFilter();
-    hpVocalMid.type = 'peaking'; hpVocalMid.frequency.value = 1400; hpVocalMid.Q.value = 0.7; hpVocalMid.gain.value = 2.5;
-
-    // Gain Compensation (+2.5dB за запазване на силата)
-    const hpCompensator = audioContext.createGain();
-    hpCompensator.gain.value = 1.35; // 1.35x ≈ +2.6dB
-
-    const hpRev = audioContext.createConvolver();
-    hpRev.buffer = impulseBuffer;
-    const hpRevGain = audioContext.createGain(); hpRevGain.gain.value = 0.08;
-
+    const hpSubBass = audioContext.createBiquadFilter(); hpSubBass.type = 'lowshelf'; hpSubBass.frequency.value = 105; hpSubBass.gain.value = 5.5;
+    const hpVocalMid = audioContext.createBiquadFilter(); hpVocalMid.type = 'peaking'; hpVocalMid.frequency.value = 1400; hpVocalMid.Q.value = 0.7; hpVocalMid.gain.value = 3;
+    const hpPinna = audioContext.createBiquadFilter(); hpPinna.type = 'peaking'; hpPinna.frequency.value = 3000; hpPinna.Q.value = 1.2; hpPinna.gain.value = 6;
+    const hpAir = audioContext.createBiquadFilter(); hpAir.type = 'highshelf'; hpAir.frequency.value = 11000; hpAir.gain.value = 2.5;
+    const hpCompensator = audioContext.createGain(); hpCompensator.gain.value = 1.3;
     const hpSplit = audioContext.createChannelSplitter(2);
     const hpPanL = audioContext.createPanner(); hpPanL.panningModel = 'HRTF'; hpPanL.positionX.value = -2.5;
     const hpPanR = audioContext.createPanner(); hpPanR.panningModel = 'HRTF'; hpPanR.positionX.value = 2.5;
+    const hpRev = audioContext.createConvolver(); hpRev.buffer = impulseBuffer;
+    const hpRevGain = audioContext.createGain(); hpRevGain.gain.value = 0.08;
 
-    // Chain: EQ -> Split -> HRTF
     analyser.connect(hpGain).connect(hpSubBass).connect(hpVocalMid).connect(hpPinna).connect(hpAir).connect(hpCompensator);
     hpCompensator.connect(hpSplit);
     hpSplit.connect(hpPanL, 0).connect(audioContext.destination);
     hpSplit.connect(hpPanR, 1).connect(audioContext.destination);
-    
-    // Parallel Reverb
     hpCompensator.connect(hpRev).connect(hpRevGain).connect(audioContext.destination);
-    
     hpGainRef.current = hpGain;
 
-    // --- 3. SPEAKERS CHAIN ---
+    // --- 3. SPEAKERS MODE (MACBOOK WIDE TUNING - ВЪЗСТАНОВЕН!) ---
     const spGain = audioContext.createGain();
     spGain.gain.value = 0; 
-    const spCompNode = audioContext.createDynamicsCompressor();
-    spCompNode.threshold.value = -20; spCompNode.ratio.value = 3.5;
-    const spPanL = audioContext.createPanner(); spPanL.panningModel = 'equalpower'; spPanL.positionX.value = -4;
-    const spPanR = audioContext.createPanner(); spPanR.panningModel = 'equalpower'; spPanR.positionX.value = 4;
-    
-    analyser.connect(spGain).connect(spCompNode);
-    spCompNode.connect(spPanL).connect(audioContext.destination);
-    spCompNode.connect(spPanR).connect(audioContext.destination);
+    const spBass = audioContext.createBiquadFilter(); spBass.type = 'lowshelf'; spBass.frequency.value = 200; spBass.gain.value = 5;
+    const spTreble = audioContext.createBiquadFilter(); spTreble.type = 'highshelf'; spTreble.frequency.value = 4000; spTreble.gain.value = 4;
+    const spComp = audioContext.createDynamicsCompressor(); spComp.threshold.value = -22; spComp.ratio.value = 4;
+    const spSplit = audioContext.createChannelSplitter(2);
+    const spPanL = audioContext.createPanner(); spPanL.panningModel = 'equalpower'; spPanL.positionX.value = -3.5;
+    const spPanR = audioContext.createPanner(); spPanR.panningModel = 'equalpower'; spPanR.positionX.value = 3.5;
+    const spRev = audioContext.createConvolver(); spRev.buffer = impulseBuffer;
+    const spRevGain = audioContext.createGain(); spRevGain.gain.value = 0.12;
+
+    analyser.connect(spGain).connect(spBass).connect(spTreble);
+    spTreble.connect(spSplit);
+    spSplit.connect(spPanL, 0).connect(spComp);
+    spSplit.connect(spPanR, 1).connect(spComp);
+    spTreble.connect(spComp); // Phantom center
+    spTreble.connect(spRev).connect(spRevGain).connect(spComp);
+    spComp.connect(audioContext.destination);
     spGainRef.current = spGain;
 
     setIrLoaded(true);
@@ -146,16 +131,12 @@ export function useAudioEngine() {
     const audioCtx = audioContextRef.current;
     if (!audioCtx || !dryGainRef.current || !hpGainRef.current || !spGainRef.current) return;
     if (audioCtx.state === 'suspended') audioCtx.resume();
-
     const now = audioCtx.currentTime;
     const fade = 0.4;
-
     [dryGainRef, hpGainRef, spGainRef].forEach(ref => ref.current?.gain.setValueAtTime(ref.current.gain.value, now));
-
     dryGainRef.current.gain.linearRampToValueAtTime(newMode === 'off' ? 1 : 0, now + fade);
     hpGainRef.current.gain.linearRampToValueAtTime(newMode === 'headphones' ? 1 : 0, now + fade);
     spGainRef.current.gain.linearRampToValueAtTime(newMode === 'speakers' ? 1 : 0, now + fade);
-
     setSpatialMode(newMode);
   }, []);
 
