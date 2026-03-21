@@ -1,205 +1,86 @@
-import React from 'react';
-import { 
-  Play, Pause, SkipForward, SkipBack, 
-  Shuffle, Repeat, Volume1, Volume2, VolumeX,
-  Loader2
-} from 'lucide-react';
-import { RepeatMode } from '@/types/music';
-import { cn } from '@/utils/cn';
-import { SpatialMode } from '@/hooks/useAudioEngine';
+import { useState, useCallback } from 'react';
+import { useMusicPlayer } from '@/hooks/useMusicPlayer';
+import { useAudioEngine } from '@/hooks/useAudioEngine';
+import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
+import { AlbumArt } from '@/components/AlbumArt';
+import { PlayerControls } from '@/components/PlayerControls';
+import { Playlist } from '@/components/Playlist';
+import { Equalizer } from '@/components/Equalizer';
+import { AudioVisualizer } from '@/components/AudioVisualizer';
+import { FileUpload } from '@/components/FileUpload';
+import { ShortcutsModal } from '@/components/ShortcutsModal';
 
-interface PlayerControlsProps {
-  isPlaying: boolean;
-  isLoading: boolean;
-  shuffle: boolean;
-  repeatMode: RepeatMode;
-  volume: number;
-  isMuted: boolean;
-  playbackRate: number;
-  currentTime: number;
-  duration: number;
-  onPlayPause: () => void;
-  onPrevious: () => void;
-  onNext: () => void;
-  onShuffle: () => void;
-  onRepeat: () => void;
-  onVolumeChange: (volume: number) => void;
-  onMuteToggle: () => void;
-  onPlaybackRateChange: (rate: number) => void;
-  onSeek: (time: number) => void;
-  spatialMode: SpatialMode;
-  onSpatialModeChange: (mode: SpatialMode) => void;
-  isSpatialLoaded: boolean;
-}
+export function App() {
+  const [showEqualizer, setShowEqualizer] = useState(false);
+  const [showShortcuts, setShowShortcuts] = useState(false);
 
-// Форматира секунди в mm:ss
-const formatTime = (seconds: number): string => {
-  if (isNaN(seconds)) return '0:00';
-  const mins = Math.floor(seconds / 60);
-  const secs = Math.floor(seconds % 60);
-  return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
-};
+  const {
+    audioRef, playlist, state, currentTrack, isLoading,
+    togglePlay, next, previous, seek, setVolume, toggleMute,
+    setPlaybackRate, toggleShuffle, toggleRepeat, playTrack,
+    addToPlaylist, removeFromPlaylist, reorderPlaylist,
+    handleTimeUpdate, handleLoadedMetadata, handleEnded, handleLoadStart,
+  } = useMusicPlayer();
 
-// Използваме именован експорт за успех при билда
-export function PlayerControls({
-  isPlaying, isLoading, shuffle, repeatMode, volume, isMuted,
-  playbackRate, currentTime, duration, onPlayPause, onPrevious, onNext,
-  onShuffle, onRepeat, onVolumeChange, onMuteToggle, onPlaybackRateChange,
-  onSeek, spatialMode, onSpatialModeChange, isSpatialLoaded
-}: PlayerControlsProps) {
-  
-  // Определя иконата за звука
-  const VolumeIcon = isMuted ? VolumeX : volume > 0.5 ? Volume2 : Volume1;
+  const {
+    analyserRef, connectAudioElement, setBandGain, applyPreset,
+    equalizerGains, currentPreset, EQUALIZER_PRESETS, FREQUENCIES,
+    spatialMode, changeSpatialMode, isSpatialLoaded,
+  } = useAudioEngine();
+
+  const onLoadedMetadata = useCallback(() => {
+    handleLoadedMetadata();
+    if (audioRef.current) {
+      connectAudioElement(audioRef.current);
+    }
+  }, [handleLoadedMetadata, connectAudioElement, audioRef]);
+
+  useKeyboardShortcuts({
+    onPlayPause: togglePlay, onNext: next, onPrevious: previous,
+    onVolumeUp: () => setVolume(Math.min(1, state.volume + 0.1)),
+    onVolumeDown: () => setVolume(Math.max(0, state.volume - 0.1)),
+    onMute: toggleMute, onSeekForward: () => seek(Math.min(state.duration, state.currentTime + 5)),
+    onSeekBackward: () => seek(Math.max(0, state.currentTime - 5)),
+    onToggleShuffle: toggleShuffle, onToggleRepeat: toggleRepeat,
+  });
 
   return (
-    <div className="flex flex-col gap-4">
-      {/* Прогрес бар и времетраене */}
-      <div className="flex items-center gap-3">
-        <span className="text-xs text-gray-400 font-mono w-10 text-right">
-          {formatTime(currentTime)}
-        </span>
-        <input
-          type="range"
-          min={0}
-          max={duration || 0}
-          value={currentTime}
-          step={0.1}
-          onChange={(e) => onSeek(parseFloat(e.target.value))}
-          className="flex-1 h-1 equalizer-slider appearance-none bg-gray-700 rounded-full cursor-pointer"
-        />
-        <span className="text-xs text-gray-400 font-mono w-10">
-          {formatTime(duration)}
-        </span>
-      </div>
-
-      {/* Бутони за управление */}
-      <div className="flex items-center justify-between gap-6">
+    <div className="min-h-screen bg-gray-950 text-gray-100 flex flex-col font-sans">
+      <main className="flex-1 flex flex-col lg:flex-row p-4 lg:p-8 gap-8 max-w-7xl mx-auto w-full overflow-hidden">
         
-        {/* Лява секция: Разбъркване и Назад */}
-        <div className="flex items-center gap-2">
-          <button 
-            onClick={onShuffle}
-            className={cn(
-              "p-2 rounded-full transition-colors",
-              shuffle ? "text-purple-400 bg-purple-500/10" : "text-gray-400 hover:text-white hover:bg-gray-800"
-            )}
-            title="Shuffle"
-          >
-            <Shuffle size={18} />
-          </button>
-          <button 
-            onClick={onPrevious}
-            className="p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-full transition-colors"
-            title="Previous"
-          >
-            <SkipBack size={18} />
-          </button>
+        {/* ЛЯВО: Плеър */}
+        <div className="flex-1 flex flex-col gap-6 min-w-0">
+          <div className="flex items-center justify-between">
+            <h1 className="text-2xl font-bold bg-gradient-to-r from-purple-400 to-pink-500 bg-clip-text text-transparent">SonicStream</h1>
+            <button onClick={() => setShowEqualizer(!showEqualizer)} className={`p-2 rounded-full ${showEqualizer ? 'bg-purple-600' : 'bg-gray-800'}`}>EQ</button>
+          </div>
+          <div className="relative aspect-video bg-gray-900 rounded-3xl overflow-hidden shadow-2xl">
+            <AlbumArt currentTrack={currentTrack} isPlaying={state.isPlaying} />
+            <div className="absolute bottom-0 left-0 right-0 p-8"><AudioVisualizer analyserRef={analyserRef} isPlaying={state.isPlaying} /></div>
+          </div>
+          <div className="space-y-1">
+            <h2 className="text-2xl font-bold truncate">{currentTrack?.title || 'No track'}</h2>
+            <p className="text-purple-400 font-medium">{currentTrack?.artist || 'Upload music'}</p>
+          </div>
+          {showEqualizer && <Equalizer frequencies={FREQUENCIES} gains={equalizerGains} setGain={setBandGain} presets={EQUALIZER_PRESETS} onApplyPreset={applyPreset} currentPreset={currentPreset} />}
         </div>
 
-        {/* Център: Пускане / Пауза */}
-        <button
-          onClick={onPlayPause}
-          disabled={isLoading}
-          className="w-12 h-12 flex items-center justify-center bg-gradient-to-br from-purple-500 to-pink-500 text-white rounded-full shadow-lg hover:shadow-purple-500/20 hover:scale-105 transition-all disabled:opacity-50 disabled:scale-100"
-          title={isPlaying ? "Pause" : "Play"}
-        >
-          {isLoading ? (
-            <Loader2 className="w-6 h-6 animate-spin" />
-          ) : isPlaying ? (
-            <Pause className="w-6 h-6 fill-white" />
-          ) : (
-            <Play className="w-6 h-6 fill-white translate-x-0.5" />
-          )}
-        </button>
-
-        {/* Дясна секция: Напред, Повторение, Скорост, Звук и Spatial */}
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2">
-            <button 
-              onClick={onNext}
-              className="p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-full transition-colors"
-              title="Next"
-            >
-              <SkipForward size={18} />
-            </button>
-            <button 
-              onClick={onRepeat}
-              className={cn(
-                "p-2 rounded-full transition-colors relative",
-                repeatMode !== 'none' ? "text-purple-400 bg-purple-500/10" : "text-gray-400 hover:text-white hover:bg-gray-800"
-              )}
-              title={`Repeat: ${repeatMode}`}
-            >
-              <Repeat size={18} />
-              {repeatMode === 'one' && (
-                <span className="absolute -top-1 -right-1 text-[8px] font-bold bg-purple-500 text-white w-4 h-4 flex items-center justify-center rounded-full scale-75">1</span>
-              )}
-            </button>
-          </div>
-
-          <div className="flex items-center gap-3 border-l border-gray-800 pl-4">
-            {/* Скорост */}
-            <select
-              value={playbackRate}
-              onChange={(e) => onPlaybackRateChange(parseFloat(e.target.value))}
-              className="text-xs bg-transparent focus:outline-none cursor-pointer font-medium text-gray-300 hover:text-white"
-              title="Playback Rate"
-            >
-              <option value="0.5" className="bg-gray-800 text-white">0.5x</option>
-              <option value="1" className="bg-gray-800 text-white">1x</option>
-              <option value="1.5" className="bg-gray-800 text-white">1.5x</option>
-              <option value="2" className="bg-gray-800 text-white">2x</option>
-            </select>
-
-            {/* Звук */}
-            <div className="flex items-center gap-2 group w-24">
-              <button 
-                onClick={onMuteToggle}
-                className="text-gray-400 group-hover:text-white transition-colors"
-                title={isMuted ? "Unmute" : "Mute"}
-              >
-                <VolumeIcon size={18} />
-              </button>
-              <input
-                type="range"
-                min={0}
-                max={1}
-                step={0.01}
-                value={isMuted ? 0 : volume}
-                onChange={(e) => onVolumeChange(parseFloat(e.target.value))}
-                className="w-16 h-1 equalizer-slider appearance-none bg-gray-700 rounded-full cursor-pointer group-hover:bg-gray-600 transition-colors"
-                title="Volume"
-              />
-            </div>
-            
-            {/* Spatial Audio Menu */}
-            <div className="flex items-center gap-1.5 border-l border-gray-800 pl-4">
-              <span className="text-xs text-gray-500">Spatial:</span>
-              <select
-                disabled={!isSpatialLoaded}
-                value={spatialMode}
-                onChange={(e) => onSpatialModeChange(e.target.value as SpatialMode)}
-                className={cn(
-                  "text-xs bg-transparent focus:outline-none cursor-pointer font-medium transition-colors",
-                  !isSpatialLoaded ? "text-gray-500" :
-                  spatialMode !== 'off' ? "text-purple-400" : "text-gray-300"
-                )}
-                title="Spatial Audio Mode"
-              >
-                <option value="off" className="bg-gray-800 text-white">
-                  {!isSpatialLoaded ? 'Loading...' : 'Normal (Off)'}
-                </option>
-                {isSpatialLoaded && (
-                  <>
-                    <option value="headphones" className="bg-gray-800 text-white">🎧 Headphones</option>
-                    <option value="speakers" className="bg-gray-800 text-white">💻 Speakers</option>
-                  </>
-                )}
-              </select>
-            </div>
-          </div>
+        {/* ДЯСНО: Плейлист и Качване */}
+        <div className="lg:w-80 flex flex-col gap-6">
+          <FileUpload onUpload={addToPlaylist} />
+          <Playlist tracks={playlist} currentTrackId={currentTrack?.id} isPlaying={state.isPlaying} onTrackSelect={playTrack} onRemoveTrack={removeFromPlaylist} onReorder={reorderPlaylist} />
         </div>
-      </div>
+      </main>
+
+      <footer className="bg-gray-900/80 backdrop-blur-xl border-t border-white/5 p-6 sticky bottom-0">
+        <PlayerControls
+          isPlaying={state.isPlaying} isLoading={isLoading} shuffle={state.shuffle} repeatMode={state.repeatMode} volume={state.volume} isMuted={state.isMuted} playbackRate={state.playbackRate} currentTime={state.currentTime} duration={state.duration}
+          onPlayPause={togglePlay} onPrevious={previous} onNext={next} onShuffle={toggleShuffle} onRepeat={toggleRepeat} onVolumeChange={setVolume} onMuteToggle={toggleMute} onPlaybackRateChange={setPlaybackRate} onSeek={seek}
+          spatialMode={spatialMode} onSpatialModeChange={changeSpatialMode} isSpatialLoaded={isSpatialLoaded}
+        />
+      </footer>
+
+      <audio ref={audioRef} onTimeUpdate={handleTimeUpdate} onLoadedMetadata={onLoadedMetadata} onEnded={handleEnded} onLoadStart={handleLoadStart} />
     </div>
   );
 }

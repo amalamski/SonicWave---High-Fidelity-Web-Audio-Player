@@ -85,17 +85,17 @@ export function useAudioEngine() {
     }
   }, []);
 
-  return {
-    analyserRef, connectAudioElement, setBandGain, equalizerGains,
-    currentPreset, spatialMode, changeSpatialMode, isSpatialLoaded,
-    FREQUENCIES,
-    EQUALIZER_PRESETS: [
-      { name: 'Flat', gains: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0] },
-      { name: 'Bass Boost', gains: [8, 6, 4, 2, 0, 0, 0, 0, 0, 0] }
-    ],
-    applyPreset: (preset: any) => {
-      preset.gains.forEach((g: number, i: number) => setBandGain(i, g));
-      setCurrentPreset(preset.name);
-    }
-  };
-}
+  // Провери само края на файла useAudioEngine.ts:
+return {
+  analyserRef,
+  connectAudioElement,
+  setBandGain,
+  equalizerGains,
+  currentPreset,
+  spatialMode,
+  changeSpatialMode,
+  isSpatialLoaded, // Трябва да е ТУК
+  FREQUENCIES,
+  EQUALIZER_PRESETS,
+  applyPreset: (p: any) => p.gains.forEach((g: any, i: any) => setBandGain(i, g))
+};
