@@ -178,11 +178,23 @@ export function useAudioEngine() {
   }, []);
 
   const connectAudioElement = useCallback((audio: HTMLAudioElement) => {
-    if (!audioContextRef.current) initAudioContext();
-    if (sourceRef.current) sourceRef.current.disconnect();
-    const source = audioContextRef.current!.createMediaElementSource(audio);
-    source.connect(gainNodeRef.current!);
-    sourceRef.current = source;
+    // 1. Първо инициализираме контекста, ако не е
+    if (!audioContextRef.current) {
+      initAudioContext();
+    }
+
+    // 2. ВАЖНО: Един аудио елемент може да се свърже само ВЕДНЪЖ като Source.
+    // Проверяваме дали вече не сме го свързали, за да не гръмне браузъра.
+    if (sourceRef.current) return; 
+
+    try {
+      const source = audioContextRef.current!.createMediaElementSource(audio);
+      source.connect(gainNodeRef.current!);
+      sourceRef.current = source;
+      console.log("✅ Audio Engine connected to element successfully");
+    } catch (err) {
+      console.error("❌ Audio connection error:", err);
+    }
   }, [initAudioContext]);
 
   const setBandGain = useCallback((bandIndex: number, gain: number) => {

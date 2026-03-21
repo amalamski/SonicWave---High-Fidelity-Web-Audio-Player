@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { useMusicPlayer } from '@/hooks/useMusicPlayer';
 import { useAudioEngine } from '@/hooks/useAudioEngine';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
@@ -14,12 +14,13 @@ export function App() {
   const [showEqualizer, setShowEqualizer] = useState(false);
   const [showShortcuts, setShowShortcuts] = useState(false);
 
+  // 1. Вземаме всичко от Music Player-а
   const {
     audioRef,
     playlist,
     state,
     currentTrack,
-    isLoading,
+    isLoading: isPlayerLoading,
     play,
     togglePlay,
     next,
@@ -35,293 +36,162 @@ export function App() {
     removeFromPlaylist,
     reorderPlaylist,
     handleTimeUpdate,
-    handleLoadedMetadata,
+    handleLoadedMetadata, // Това е оригиналната функция
     handleEnded,
     handleLoadStart,
   } = useMusicPlayer();
 
-  // App.tsx - Горната част
-const {
-  analyserRef,
-  initAudioContext,
-  connectAudioElement,
-  setBandGain,
-  applyPreset,
-  equalizerGains,
-  currentPreset,
-  EQUALIZER_PRESETS,
-  FREQUENCIES,
-  spatialMode,
-  changeSpatialMode,
-  isSpatialLoaded, // Тук е само името на променливата
-} = useAudioEngine(); // Край на деструктурирането
+  // 2. Вземаме всичко от Audio Engine-а
+  const {
+    analyserRef,
+    connectAudioElement,
+    setBandGain,
+    applyPreset,
+    equalizerGains,
+    currentPreset,
+    EQUALIZER_PRESETS,
+    FREQUENCIES,
+    spatialMode,
+    changeSpatialMode,
+    isSpatialLoaded,
+  } = useAudioEngine();
 
-  useEffect(() => {
-    const audio = audioRef.current;
-    if (audio) {
-      const handleFirstPlay = () => {
-        initAudioContext();
-        connectAudioElement(audio);
-      };
-      audio.addEventListener('play', handleFirstPlay, { once: true });
-      return () => audio.removeEventListener('play', handleFirstPlay);
+  // 3. НОВА ФУНКЦИЯ: Обединяваме метаданните и свързването на аудиото
+  const onLoadedMetadata = useCallback(() => {
+    handleLoadedMetadata(); // Обновява времетраенето на песента
+    if (audioRef.current) {
+      connectAudioElement(audioRef.current); // Свързва Spatial Audio-то
     }
-  }, [audioRef, initAudioContext, connectAudioElement]);
+  }, [handleLoadedMetadata, connectAudioElement, audioRef]);
 
-  const handleVolumeUp = useCallback(() => {
-    setVolume(Math.min(state.volume + 0.1, 1));
-  }, [setVolume, state.volume]);
-
-  const handleVolumeDown = useCallback(() => {
-    setVolume(Math.max(state.volume - 0.1, 0));
-  }, [setVolume, state.volume]);
-
-  const handleSeekForward = useCallback(() => {
-    seek(Math.min(state.currentTime + 5, state.duration));
-  }, [seek, state.currentTime, state.duration]);
-
-  const handleSeekBackward = useCallback(() => {
-    seek(Math.max(state.currentTime - 5, 0));
-  }, [seek, state.currentTime]);
-
-  const { shortcuts } = useKeyboardShortcuts({
+  // Клавишни преки пътища
+  useKeyboardShortcuts({
     onPlayPause: togglePlay,
     onNext: next,
     onPrevious: previous,
-    onVolumeUp: handleVolumeUp,
-    onVolumeDown: handleVolumeDown,
+    onVolumeUp: () => setVolume(Math.min(1, state.volume + 0.1)),
+    onVolumeDown: () => setVolume(Math.max(0, state.volume - 0.1)),
     onMute: toggleMute,
-    onSeekForward: handleSeekForward,
-    onSeekBackward: handleSeekBackward,
+    onSeekForward: () => seek(Math.min(state.duration, state.currentTime + 5)),
+    onSeekBackward: () => seek(Math.max(0, state.currentTime - 5)),
     onToggleShuffle: toggleShuffle,
     onToggleRepeat: toggleRepeat,
   });
 
-  const handleFilesAdded = useCallback((tracks: unknown[]) => {
-    tracks.forEach((track) => addToPlaylist(track as any));
-  }, [addToPlaylist]);
-
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900/20 to-gray-900 text-white">
-      {/* Hidden Audio Element */}
-      <audio
-        ref={audioRef}
-        crossOrigin="anonymous" 
-        src={currentTrack?.url}
-        onTimeUpdate={handleTimeUpdate}
-        onLoadedMetadata={handleLoadedMetadata}
-        onEnded={handleEnded}
-        onLoadStart={handleLoadStart}
-        onCanPlay={() => isLoading && play()}
-      />
-
-      {/* Header */}
-      <header className="sticky top-0 z-40 backdrop-blur-lg bg-gray-900/50 border-b border-gray-800">
-        <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
-              <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z" />
-              </svg>
-            </div>
+    <div className="min-h-screen bg-gray-950 text-gray-100 flex flex-col font-sans selection:bg-purple-500/30">
+      <main className="flex-1 flex flex-col lg:flex-row p-4 lg:p-8 gap-8 max-w-7xl mx-auto w-full overflow-hidden">
+        
+        {/* Лява страна: Трак и Визуализация */}
+        <div className="flex-1 flex flex-col gap-6 min-w-0">
+          <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
-                SonicWave
+              <h1 className="text-2xl font-bold bg-gradient-to-r from-purple-400 to-pink-500 bg-clip-text text-transparent">
+                SonicStream
               </h1>
-              <p className="text-xs text-gray-500">Music Player</p>
+              <p className="text-gray-400 text-sm">Hi-Fi Spatial Audio Player</p>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setShowShortcuts(true)}
+                className="p-2 hover:bg-gray-800 rounded-full transition-colors text-gray-400 hover:text-white"
+                title="Keyboard Shortcuts"
+              >
+                <kbd className="text-xs border border-gray-600 px-1.5 py-0.5 rounded">?</kbd>
+              </button>
+              <button
+                onClick={() => setShowEqualizer(!showEqualizer)}
+                className={`p-2 rounded-full transition-all ${
+                  showEqualizer ? 'bg-purple-600 text-white shadow-lg shadow-purple-500/20' : 'hover:bg-gray-800 text-gray-400'
+                }`}
+                title="Equalizer & Spatial"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 5h2M11 9h2M11 13h2M11 17h2M11 21h2M18 5h2M18 9h2M18 13h2M18 17h2M18 21h2M4 5h2M4 9h2M4 13h2M4 17h2M4 21h2"/></svg>
+              </button>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setShowEqualizer(!showEqualizer)}
-              className="p-2 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800 transition-colors"
-              title="Equalizer"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
-              </svg>
-            </button>
-            <button
-              onClick={() => setShowShortcuts(true)}
-              className="p-2 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800 transition-colors"
-              title="Keyboard Shortcuts"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-              </svg>
-            </button>
+          <div className="relative group aspect-square lg:aspect-video bg-gray-900 rounded-3xl overflow-hidden shadow-2xl border border-white/5">
+            <AlbumArt currentTrack={currentTrack} isPlaying={state.isPlaying} />
+            <div className="absolute inset-0 bg-gradient-to-t from-gray-950/80 via-transparent to-transparent opacity-60" />
+            <div className="absolute bottom-0 left-0 right-0 p-8">
+              <AudioVisualizer analyserRef={analyserRef} isPlaying={state.isPlaying} />
+            </div>
           </div>
+
+          <div className="space-y-1">
+            <h2 className="text-2xl font-bold truncate">{currentTrack?.title}</h2>
+            <p className="text-purple-400 font-medium">{currentTrack?.artist}</p>
+          </div>
+
+          {showEqualizer && (
+            <div className="animate-in fade-in slide-in-from-top-4 duration-300">
+              <Equalizer
+                frequencies={FREQUENCIES}
+                gains={equalizerGains}
+                setGain={setBandGain}
+                presets={EQUALIZER_PRESETS}
+                onApplyPreset={applyPreset}
+                currentPreset={currentPreset}
+              />
+            </div>
+          )}
         </div>
-      </header>
 
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 py-6">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Left Column - Now Playing */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* Album Art & Visualizer */}
-            <div className="relative">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <AlbumArt
-                  track={currentTrack}
-                  isPlaying={state.isPlaying}
-                  className="w-full max-w-sm mx-auto"
-                />
-                
-                {/* Visualizer */}
-                <div className="hidden md:block bg-gray-800/50 backdrop-blur-lg rounded-2xl p-4 h-64">
-                  <AudioVisualizer
-                    analyser={analyserRef.current}
-                    isPlaying={state.isPlaying}
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Track Info */}
-            <div className="text-center">
-              <h2 className="text-2xl font-bold text-white truncate">
-                {currentTrack?.title || 'No Track Selected'}
-              </h2>
-              <p className="text-gray-400 mt-1">
-                {currentTrack?.artist || 'Select a track to play'}
-              </p>
-              {currentTrack?.album && (
-                <p className="text-gray-500 text-sm mt-1">{currentTrack.album}</p>
-              )}
-            </div>
-
-            {/* Player Controls */}
-            <div className="bg-gray-800/50 backdrop-blur-lg rounded-2xl p-6">
-              <PlayerControls
-              isPlaying={state.isPlaying}
-              isLoading={isLoading}
-              shuffle={state.shuffle}
-              repeatMode={state.repeatMode}
-              volume={state.volume}
-              isMuted={state.isMuted}
-              playbackRate={state.playbackRate}
-              currentTime={state.currentTime}
-              duration={state.duration}
-              onPlayPause={togglePlay}
-              onPrevious={previous}
-              onNext={next}
-              onShuffle={toggleShuffle}
-              onRepeat={toggleRepeat}
-              onVolumeChange={setVolume}
-              onMuteToggle={toggleMute}
-              onPlaybackRateChange={setPlaybackRate}
-              onSeek={seek}
-              // ДОБАВИ ТЕЗИ 3 РЕДА (и премахни audioRef ако е там):
-              spatialMode={spatialMode}
-              onSpatialModeChange={changeSpatialMode}
-              isSpatialLoaded={isSpatialLoaded}
-            />
-            </div>
-
-            {/* Equalizer Panel - Mobile */}
-            {showEqualizer && (
-              <div className="lg:hidden">
-                <Equalizer
-                  gains={equalizerGains}
-                  frequencies={FREQUENCIES}
-                  presets={EQUALIZER_PRESETS}
-                  currentPreset={currentPreset}
-                  onGainChange={setBandGain}
-                  onPresetChange={applyPreset}
-                />
-              </div>
-            )}
-          </div>
-
-          {/* Right Column - Playlist & Equalizer */}
-          <div className="space-y-6">
-            {/* Playlist */}
-            <Playlist
-              tracks={playlist}
-              currentTrackIndex={state.currentTrackIndex}
-              isPlaying={state.isPlaying}
-              onTrackSelect={playTrack}
-              onRemoveTrack={removeFromPlaylist}
-              onReorder={reorderPlaylist}
-            />
-
-            {/* File Upload */}
-            <FileUpload onFilesAdded={handleFilesAdded} />
-
-            {/* Equalizer - Desktop */}
-            {showEqualizer && (
-              <div className="hidden lg:block">
-                <Equalizer
-                  gains={equalizerGains}
-                  frequencies={FREQUENCIES}
-                  presets={EQUALIZER_PRESETS}
-                  currentPreset={currentPreset}
-                  onGainChange={setBandGain}
-                  onPresetChange={applyPreset}
-                />
-              </div>
-            )}
-          </div>
+        {/* Дясна страна: Плейлист */}
+        <div className="lg:w-80 flex flex-col gap-6 h-[500px] lg:h-auto">
+          <FileUpload onUpload={addToPlaylist} />
+          <Playlist
+            tracks={playlist}
+            currentTrackId={currentTrack?.id}
+            isPlaying={state.isPlaying}
+            onTrackSelect={playTrack}
+            onRemoveTrack={removeFromPlaylist}
+            onReorder={reorderPlaylist}
+          />
         </div>
       </main>
 
-      {/* Keyboard Shortcuts Modal */}
-      <ShortcutsModal
-        isOpen={showShortcuts}
-        onClose={() => setShowShortcuts(false)}
-        shortcuts={shortcuts}
-      />
-
-      {/* Footer */}
-      <footer className="text-center py-4 text-gray-500 text-sm">
-        <p>Press <kbd className="px-2 py-1 bg-gray-800 rounded text-xs">?</kbd> for keyboard shortcuts</p>
+      {/* Контроли за управление */}
+      <footer className="bg-gray-900/50 backdrop-blur-xl border-t border-white/5 p-4 lg:p-6 sticky bottom-0 z-50">
+        <div className="max-w-7xl mx-auto">
+          <PlayerControls
+            isPlaying={state.isPlaying}
+            isLoading={isPlayerLoading}
+            shuffle={state.shuffle}
+            repeatMode={state.repeatMode}
+            volume={state.volume}
+            isMuted={state.isMuted}
+            playbackRate={state.playbackRate}
+            currentTime={state.currentTime}
+            duration={state.duration}
+            onPlayPause={togglePlay}
+            onPrevious={previous}
+            onNext={next}
+            onShuffle={toggleShuffle}
+            onRepeat={toggleRepeat}
+            onVolumeChange={setVolume}
+            onMuteToggle={toggleMute}
+            onPlaybackRateChange={setPlaybackRate}
+            onSeek={seek}
+            spatialMode={spatialMode}
+            onSpatialModeChange={changeSpatialMode}
+            isSpatialLoaded={isSpatialLoaded}
+          />
+        </div>
       </footer>
 
-      <style>{`
-        .custom-scrollbar::-webkit-scrollbar {
-          width: 6px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-track {
-          background: transparent;
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb {
-          background: rgba(139, 92, 246, 0.3);
-          border-radius: 3px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-          background: rgba(139, 92, 246, 0.5);
-        }
-        @keyframes pulse-subtle {
-          0%, 100% { opacity: 1; }
-          50% { opacity: 0.9; }
-        }
-        .animate-pulse-subtle {
-          animation: pulse-subtle 2s ease-in-out infinite;
-        }
-        .equalizer-slider {
-          -webkit-appearance: none;
-          background: transparent;
-        }
-        .equalizer-slider::-webkit-slider-thumb {
-          -webkit-appearance: none;
-          height: 16px;
-          width: 16px;
-          border-radius: 50%;
-          background: linear-gradient(135deg, #a855f7, #ec4899);
-          cursor: pointer;
-          margin-top: -6px;
-          box-shadow: 0 2px 6px rgba(168, 85, 247, 0.5);
-        }
-        .equalizer-slider::-webkit-slider-runnable-track {
-          width: 100%;
-          height: 4px;
-          cursor: pointer;
-          background: linear-gradient(to right, #374151, #4b5563);
-          border-radius: 2px;
-        }
-      `}</style>
+      <audio
+        ref={audioRef}
+        onTimeUpdate={handleTimeUpdate}
+        onLoadedMetadata={onLoadedMetadata}
+        onEnded={handleEnded}
+        onLoadStart={handleLoadStart}
+      />
+
+      {showShortcuts && <ShortcutsModal onClose={() => setShowShortcuts(false)} />}
     </div>
   );
 }
+
+export default App;
