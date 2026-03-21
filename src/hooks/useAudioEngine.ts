@@ -200,8 +200,17 @@ export function useAudioEngine() {
   }, [setBandGain]);
 
   return {
-    analyserRef, initAudioContext, connectAudioElement, setBandGain, applyPreset,
-    equalizerGains, currentPreset, EQUALIZER_PRESETS, FREQUENCIES,
-    spatialMode, changeSpatialMode, isSpatialLoaded
-  };
+  analyserRef, 
+  initAudioContext, 
+  connectAudioElement, 
+  setBandGain, 
+  applyPreset,
+  equalizerGains, 
+  currentPreset, 
+  EQUALIZER_PRESETS, 
+  FREQUENCIES,
+  spatialMode, 
+  changeSpatialMode, 
+  isSpatialLoaded // <--- ПРОВЕРИ ТОВА
+};
 }
