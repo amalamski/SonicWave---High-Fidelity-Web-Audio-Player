@@ -82,53 +82,59 @@ export function useAudioEngine() {
     analyser.connect(dryGain).connect(audioContext.destination);
     dryGainRef.current = dryGain;
 
-    // --- 2. HEADPHONES MODE (ADVANCED SPATIAL & V-SHAPE TUNING) ---
+    // --- 2. HEADPHONES MODE (VOCAL AIR & CLARITY TUNING) ---
     const hpGain = audioContext.createGain();
     hpGain.gain.value = 0; 
     
-    // Harman + Extra Bass (Повече плътност)
+    // Harman Sub-Bass (Запазваме плътността)
     const hpSubBass = audioContext.createBiquadFilter();
-    hpSubBass.type = 'lowshelf'; hpSubBass.frequency.value = 105; hpSubBass.gain.value = 7.0; // Усилен бас
+    hpSubBass.type = 'lowshelf'; hpSubBass.frequency.value = 105; hpSubBass.gain.value = 6.0;
 
-    // Mid-Range Scoop (Намаляваме средните за повече "въздух")
+    // Mid-Range Scoop (Леко намаляваме долните среди, за да не е "мътен" вокала)
     const hpMidScoop = audioContext.createBiquadFilter();
-    hpMidScoop.type = 'peaking'; hpMidScoop.frequency.value = 1500; hpMidScoop.Q.value = 0.5; hpMidScoop.gain.value = -2.5;
+    hpMidScoop.type = 'peaking'; hpMidScoop.frequency.value = 1200; hpMidScoop.Q.value = 0.5; hpMidScoop.gain.value = -2.0;
 
-    // Pinna & Air (Кристални високи)
+    // НОВО: Vocal Definition (Това ще "отпуши" вокалите)
+    const hpVocalClarity = audioContext.createBiquadFilter();
+    hpVocalClarity.type = 'peaking'; hpVocalClarity.frequency.value = 4500; hpVocalClarity.Q.value = 1.0; hpVocalClarity.gain.value = 4.0;
+
+    // Pinna Gain (3kHz - стандарт за присъствие)
     const hpPinna = audioContext.createBiquadFilter();
-    hpPinna.type = 'peaking'; hpPinna.frequency.value = 3200; hpPinna.Q.value = 1.2; hpPinna.gain.value = 5.5;
+    hpPinna.type = 'peaking'; hpPinna.frequency.value = 3000; hpPinna.Q.value = 1.2; hpPinna.gain.value = 5.0;
     
+    // High-End Air (Въздух над вокалите)
     const hpAir = audioContext.createBiquadFilter();
-    hpAir.type = 'highshelf'; hpAir.frequency.value = 12000; hpAir.gain.value = 4.0; // Повече въздух
+    hpAir.type = 'highshelf'; hpAir.frequency.value = 9000; hpAir.gain.value = 5.0; // По-агресивен въздух
 
     const hpCompensator = audioContext.createGain();
-    hpCompensator.gain.value = 1.3;
+    hpCompensator.gain.value = 1.25;
 
     const hpSplit = audioContext.createChannelSplitter(2);
     
-    // ПАНЕЛ С ВЪЗДУХ И ВИСОЧИНА (Y-axis)
+    // Позициониране (Запазваме височината Y)
     const hpPanL = audioContext.createPanner(); 
     hpPanL.panningModel = 'HRTF'; 
-    hpPanL.positionX.value = -2.6; // Малко по-широко
-    hpPanL.positionY.value = 0.6;  // Повдигаме сцената нагоре
-    hpPanL.positionZ.value = -1.5; // Малко по-напред
+    hpPanL.positionX.value = -2.4; 
+    hpPanL.positionY.value = 0.7;  // Малко по-високо за повече ефирност
+    hpPanL.positionZ.value = -1.4;
 
     const hpPanR = audioContext.createPanner(); 
     hpPanR.panningModel = 'HRTF'; 
-    hpPanR.positionX.value = 2.6; 
-    hpPanR.positionY.value = 0.6;  
-    hpPanR.positionZ.value = -1.5;
+    hpPanR.positionX.value = 2.4; 
+    hpPanR.positionY.value = 0.7;  
+    hpPanR.positionZ.value = -1.4;
 
     const hpRev = audioContext.createConvolver();
     hpRev.buffer = impulseBuffer;
     const hpRevGain = audioContext.createGain(); 
-    hpRevGain.gain.value = 0.09; // Една идея повече реверб за обем
+    hpRevGain.gain.value = 0.07; 
 
-    // Свързване на веригата
+    // Свързване: Source -> EQ Chain -> Pan
     analyser.connect(hpGain)
             .connect(hpSubBass)
             .connect(hpMidScoop)
             .connect(hpPinna)
+            .connect(hpVocalClarity) // Включваме новата яснота
             .connect(hpAir)
             .connect(hpCompensator);
 
@@ -136,7 +142,6 @@ export function useAudioEngine() {
     hpSplit.connect(hpPanL, 0).connect(audioContext.destination);
     hpSplit.connect(hpPanR, 1).connect(audioContext.destination);
     
-    // Паралелен обем
     hpCompensator.connect(hpRev).connect(hpRevGain).connect(audioContext.destination);
     
     hpGainRef.current = hpGain;
