@@ -82,59 +82,64 @@ export function useAudioEngine() {
     analyser.connect(dryGain).connect(audioContext.destination);
     dryGainRef.current = dryGain;
 
-    // --- 2. HEADPHONES MODE (VOCAL AIR & CLARITY TUNING) ---
+    // --- 2. HEADPHONES MODE (NATURAL & BALANCED TUNING) ---
     const hpGain = audioContext.createGain();
     hpGain.gain.value = 0; 
     
-    // Harman Sub-Bass (Запазваме плътността)
-    const hpSubBass = audioContext.createBiquadFilter();
-    hpSubBass.type = 'lowshelf'; hpSubBass.frequency.value = 105; hpSubBass.gain.value = 6.0;
+    // 125Hz Warmth Boost (+2dB според твоето изискване)
+    const hpWarmth = audioContext.createBiquadFilter();
+    hpWarmth.type = 'peaking'; hpWarmth.frequency.value = 125; hpWarmth.Q.value = 0.7; hpWarmth.gain.value = 2.0;
 
-    // Mid-Range Scoop (Леко намаляваме долните среди, за да не е "мътен" вокала)
+    // 500Hz Boxiness Reduction (Ниски среди - леко намалени)
+    const hpLowMidClear = audioContext.createBiquadFilter();
+    hpLowMidClear.type = 'peaking'; hpLowMidClear.frequency.value = 500; hpLowMidClear.Q.value = 0.5; hpLowMidClear.gain.value = -1.5;
+
+    // Mid-Range Natural Scoop (Намаляваме средите за по-малко агресия)
     const hpMidScoop = audioContext.createBiquadFilter();
-    hpMidScoop.type = 'peaking'; hpMidScoop.frequency.value = 1200; hpMidScoop.Q.value = 0.5; hpMidScoop.gain.value = -2.0;
+    hpMidScoop.type = 'peaking'; hpMidScoop.frequency.value = 1000; hpMidScoop.Q.value = 0.4; hpMidScoop.gain.value = -2.0;
 
-    // НОВО: Vocal Definition (Това ще "отпуши" вокалите)
+    // 2000Hz Definition (+2dB според твоето изискване за естествено присъствие)
+    const hpDefinition = audioContext.createBiquadFilter();
+    hpDefinition.type = 'peaking'; hpDefinition.frequency.value = 2000; hpDefinition.Q.value = 1.0; hpDefinition.gain.value = 2.0;
+
+    // Vocal Clarity (Намаляваме малко спрямо преди за по-естествен звук)
     const hpVocalClarity = audioContext.createBiquadFilter();
-    hpVocalClarity.type = 'peaking'; hpVocalClarity.frequency.value = 4500; hpVocalClarity.Q.value = 1.0; hpVocalClarity.gain.value = 4.0;
-
-    // Pinna Gain (3kHz - стандарт за присъствие)
-    const hpPinna = audioContext.createBiquadFilter();
-    hpPinna.type = 'peaking'; hpPinna.frequency.value = 3000; hpPinna.Q.value = 1.2; hpPinna.gain.value = 5.0;
+    hpVocalClarity.type = 'peaking'; hpVocalClarity.frequency.value = 4000; hpVocalClarity.Q.value = 1.0; hpVocalClarity.gain.value = 2.5;
     
-    // High-End Air (Въздух над вокалите)
+    // High-End Air (По-плавен въздух, по-малко остри високи)
     const hpAir = audioContext.createBiquadFilter();
-    hpAir.type = 'highshelf'; hpAir.frequency.value = 9000; hpAir.gain.value = 5.0; // По-агресивен въздух
+    hpAir.type = 'highshelf'; hpAir.frequency.value = 10000; hpAir.gain.value = 3.0;
 
     const hpCompensator = audioContext.createGain();
-    hpCompensator.gain.value = 1.25;
+    hpCompensator.gain.value = 1.2;
 
     const hpSplit = audioContext.createChannelSplitter(2);
     
-    // Позициониране (Запазваме височината Y)
+    // Позициониране (Запазваме широката, но ефирна сцена)
     const hpPanL = audioContext.createPanner(); 
     hpPanL.panningModel = 'HRTF'; 
-    hpPanL.positionX.value = -2.4; 
-    hpPanL.positionY.value = 0.7;  // Малко по-високо за повече ефирност
+    hpPanL.positionX.value = -2.5; 
+    hpPanL.positionY.value = 0.5;  
     hpPanL.positionZ.value = -1.4;
 
     const hpPanR = audioContext.createPanner(); 
     hpPanR.panningModel = 'HRTF'; 
-    hpPanR.positionX.value = 2.4; 
-    hpPanR.positionY.value = 0.7;  
+    hpPanR.positionX.value = 2.5; 
+    hpPanR.positionY.value = 0.5;  
     hpPanR.positionZ.value = -1.4;
 
     const hpRev = audioContext.createConvolver();
     hpRev.buffer = impulseBuffer;
     const hpRevGain = audioContext.createGain(); 
-    hpRevGain.gain.value = 0.07; 
+    hpRevGain.gain.value = 0.06; // Малко по-дискретен реверб за по-натурално усещане
 
-    // Свързване: Source -> EQ Chain -> Pan
+    // Свързване на веригата
     analyser.connect(hpGain)
-            .connect(hpSubBass)
+            .connect(hpWarmth)
+            .connect(hpLowMidClear)
             .connect(hpMidScoop)
-            .connect(hpPinna)
-            .connect(hpVocalClarity) // Включваме новата яснота
+            .connect(hpDefinition)
+            .connect(hpVocalClarity)
             .connect(hpAir)
             .connect(hpCompensator);
 
