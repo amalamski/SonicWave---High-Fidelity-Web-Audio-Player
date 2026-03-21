@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useMusicPlayer } from '@/hooks/useMusicPlayer';
 import { useAudioEngine } from '@/hooks/useAudioEngine';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
@@ -14,7 +14,7 @@ export function App() {
   const [showEqualizer, setShowEqualizer] = useState(false);
   const [showShortcuts, setShowShortcuts] = useState(false);
 
-  // 1. Вземаме всичко от Music Player-а (ВАЖНО за качването)
+  // 1. Вземаме всичко от Music Player-а
   const {
     audioRef,
     playlist,
@@ -31,7 +31,7 @@ export function App() {
     toggleShuffle,
     toggleRepeat,
     playTrack,
-    addToPlaylist, // Тази функция оправя грешката 'f is not a function'
+    addToPlaylist, // Тази функция ТРЯБВА да е тук
     removeFromPlaylist,
     reorderPlaylist,
     handleTimeUpdate,
@@ -55,7 +55,12 @@ export function App() {
     isSpatialLoaded,
   } = useAudioEngine();
 
-  // 3. ФИКСЪТ: Свързваме аудиото, без да променяме визията
+  // Дебъг: Ще видим в конзолата дали функцията съществува
+  useEffect(() => {
+    console.log("Is addToPlaylist defined?", typeof addToPlaylist === 'function');
+  }, [addToPlaylist]);
+
+  // ФИКС за Atmos
   const onLoadedMetadata = useCallback(() => {
     handleLoadedMetadata();
     if (audioRef.current) {
@@ -80,27 +85,20 @@ export function App() {
     <div className="min-h-screen bg-gray-950 text-gray-100 flex flex-col font-sans selection:bg-purple-500/30">
       <main className="flex-1 flex flex-col lg:flex-row p-4 lg:p-8 gap-8 max-w-7xl mx-auto w-full overflow-hidden">
         
-        {/* ЛЯВА СЕКЦИЯ: Плеър и Визуализация */}
+        {/* ЛЯВА СЕКЦИЯ: Трак и Визуализация */}
         <div className="flex-1 flex flex-col gap-6 min-w-0">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-bold bg-gradient-to-r from-purple-400 to-pink-500 bg-clip-text text-transparent">
-                SonicStream
-              </h1>
+              <h1 className="text-2xl font-bold bg-gradient-to-r from-purple-400 to-pink-500 bg-clip-text text-transparent">SonicStream</h1>
               <p className="text-gray-400 text-sm">Hi-Fi Spatial Audio Player</p>
             </div>
             <div className="flex gap-2">
-              <button
-                onClick={() => setShowShortcuts(true)}
-                className="p-2 hover:bg-gray-800 rounded-full transition-colors text-gray-400 hover:text-white"
-              >
+              <button onClick={() => setShowShortcuts(true)} className="p-2 hover:bg-gray-800 rounded-full text-gray-400">
                 <kbd className="text-xs border border-gray-600 px-1.5 py-0.5 rounded">?</kbd>
               </button>
               <button
                 onClick={() => setShowEqualizer(!showEqualizer)}
-                className={`p-2 rounded-full transition-all ${
-                  showEqualizer ? 'bg-purple-600 text-white shadow-lg' : 'hover:bg-gray-800 text-gray-400'
-                }`}
+                className={`p-2 rounded-full transition-all ${showEqualizer ? 'bg-purple-600 text-white' : 'hover:bg-gray-800 text-gray-400'}`}
               >
                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 5h2M11 9h2M11 13h2M11 17h2M11 21h2M18 5h2M18 9h2M18 13h2M18 17h2M18 21h2M4 5h2M4 9h2M4 13h2M4 17h2M4 21h2"/></svg>
               </button>
@@ -123,19 +121,15 @@ export function App() {
           {showEqualizer && (
             <div className="animate-in fade-in slide-in-from-top-4 duration-300">
               <Equalizer
-                frequencies={FREQUENCIES}
-                gains={equalizerGains}
-                setGain={setBandGain}
-                presets={EQUALIZER_PRESETS}
-                onApplyPreset={applyPreset}
-                currentPreset={currentPreset}
+                frequencies={FREQUENCIES} gains={equalizerGains} setGain={setBandGain}
+                presets={EQUALIZER_PRESETS} onApplyPreset={applyPreset} currentPreset={currentPreset}
               />
             </div>
           )}
         </div>
 
-        {/* ДЯСНА СЕКЦИЯ: Качване и Плейлист (ТВОЯТА ОРИГИНАЛНА ВИЗИЯ) */}
-        <div className="lg:w-80 flex flex-col gap-6 h-[500px] lg:h-auto">
+        {/* ДЯСНА СЕКЦИЯ: Качване и Плейлист (ТВОЯТА ВИЗИЯ) */}
+        <div className="lg:w-80 flex flex-col gap-6 h-[500px] lg:h-auto overflow-hidden">
           <FileUpload onUpload={addToPlaylist} />
           <Playlist
             tracks={playlist}
@@ -152,27 +146,13 @@ export function App() {
       <footer className="bg-gray-900/50 backdrop-blur-xl border-t border-white/5 p-4 lg:p-6 sticky bottom-0 z-50">
         <div className="max-w-7xl mx-auto">
           <PlayerControls
-            isPlaying={state.isPlaying}
-            isLoading={isLoading}
-            shuffle={state.shuffle}
-            repeatMode={state.repeatMode}
-            volume={state.volume}
-            isMuted={state.isMuted}
-            playbackRate={state.playbackRate}
-            currentTime={state.currentTime}
-            duration={state.duration}
-            onPlayPause={togglePlay}
-            onPrevious={previous}
-            onNext={next}
-            onShuffle={toggleShuffle}
-            onRepeat={toggleRepeat}
-            onVolumeChange={setVolume}
-            onMuteToggle={toggleMute}
-            onPlaybackRateChange={setPlaybackRate}
-            onSeek={seek}
-            spatialMode={spatialMode}
-            onSpatialModeChange={changeSpatialMode}
-            isSpatialLoaded={isSpatialLoaded}
+            isPlaying={state.isPlaying} isLoading={isLoading} shuffle={state.shuffle}
+            repeatMode={state.repeatMode} volume={state.volume} isMuted={state.isMuted}
+            playbackRate={state.playbackRate} currentTime={state.currentTime} duration={state.duration}
+            onPlayPause={togglePlay} onPrevious={previous} onNext={next} onShuffle={toggleShuffle}
+            onRepeat={toggleRepeat} onVolumeChange={setVolume} onMuteToggle={toggleMute}
+            onPlaybackRateChange={setPlaybackRate} onSeek={seek}
+            spatialMode={spatialMode} onSpatialModeChange={changeSpatialMode} isSpatialLoaded={isSpatialLoaded}
           />
         </div>
       </footer>
