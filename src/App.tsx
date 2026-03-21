@@ -14,13 +14,14 @@ export function App() {
   const [showEqualizer, setShowEqualizer] = useState(false);
   const [showShortcuts, setShowShortcuts] = useState(false);
 
-  // Вземаме всичко от Music Player-а точно с оригиналните имена
+  // Вземаме всичко от Music Player-а - БЕЗ СЪКРАЩЕНИЯ
   const {
     audioRef,
     playlist,
     state,
     currentTrack,
     isLoading,
+    play,
     togglePlay,
     next,
     previous,
@@ -31,7 +32,7 @@ export function App() {
     toggleShuffle,
     toggleRepeat,
     playTrack,
-    addToPlaylist,
+    addToPlaylist, // ГАРАНТИРАНО ТУК ЗА ФАЙЛОВЕТЕ
     removeFromPlaylist,
     reorderPlaylist,
     handleTimeUpdate,
@@ -55,11 +56,11 @@ export function App() {
     isSpatialLoaded,
   } = useAudioEngine();
 
-  // ФИКСЪТ: Свързваме двата свята тук, без да променяме нищо друго
+  // ФИКС за Atmos: Свързваме аудиото при зареждане на песен
   const onLoadedMetadata = useCallback(() => {
-    handleLoadedMetadata(); // Запазва оригиналното поведение
+    handleLoadedMetadata();
     if (audioRef.current) {
-      connectAudioElement(audioRef.current); // Активира Spatial Audio
+      connectAudioElement(audioRef.current);
     }
   }, [handleLoadedMetadata, connectAudioElement, audioRef]);
 
@@ -80,7 +81,7 @@ export function App() {
     <div className="min-h-screen bg-gray-950 text-gray-100 flex flex-col font-sans selection:bg-purple-500/30">
       <main className="flex-1 flex flex-col lg:flex-row p-4 lg:p-8 gap-8 max-w-7xl mx-auto w-full overflow-hidden">
         
-        {/* ЛЯВА СЕКЦИЯ: Трак и Визуализация */}
+        {/* ЛЯВА СТРАНА: Трак и Визуализация */}
         <div className="flex-1 flex flex-col gap-6 min-w-0">
           <div className="flex items-center justify-between">
             <div>
@@ -136,7 +137,7 @@ export function App() {
           )}
         </div>
 
-        {/* ДЯСНА СЕКЦИЯ: Качване и Плейлист */}
+        {/* ДЯСНА СТРАНА: Качване и Плейлист (Оригинален лейаут) */}
         <div className="lg:w-80 flex flex-col gap-6 h-[500px] lg:h-auto">
           <FileUpload onUpload={addToPlaylist} />
           <Playlist
@@ -150,7 +151,7 @@ export function App() {
         </div>
       </main>
 
-      {/* ФУТЪР: Контроли */}
+      {/* ФУТЪР: Пълен контрол панел */}
       <footer className="bg-gray-900/50 backdrop-blur-xl border-t border-white/5 p-4 lg:p-6 sticky bottom-0 z-50">
         <div className="max-w-7xl mx-auto">
           <PlayerControls
@@ -189,6 +190,7 @@ export function App() {
 
       {showShortcuts && <ShortcutsModal onClose={() => setShowShortcuts(false)} />}
 
+      {/* Твоите CSS стилове - без промяна */}
       <style>{`
         .custom-scrollbar::-webkit-scrollbar { width: 6px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
