@@ -82,64 +82,59 @@ export function useAudioEngine() {
     analyser.connect(dryGain).connect(audioContext.destination);
     dryGainRef.current = dryGain;
 
-    // --- 2. HEADPHONES MODE (NATURAL & BALANCED TUNING) ---
+    // --- 2. HEADPHONES MODE (HIGH-CLARITY & POWER TUNING) ---
     const hpGain = audioContext.createGain();
     hpGain.gain.value = 0; 
     
-    // 125Hz Warmth Boost (+2dB според твоето изискване)
-    const hpWarmth = audioContext.createBiquadFilter();
-    hpWarmth.type = 'peaking'; hpWarmth.frequency.value = 125; hpWarmth.Q.value = 0.7; hpWarmth.gain.value = 2.0;
+    // 1. Плътен, но контролиран бас (110Hz)
+    const hpBass = audioContext.createBiquadFilter();
+    hpBass.type = 'lowshelf'; hpBass.frequency.value = 110; hpBass.gain.value = 4.5;
 
-    // 500Hz Boxiness Reduction (Ниски среди - леко намалени)
-    const hpLowMidClear = audioContext.createBiquadFilter();
-    hpLowMidClear.type = 'peaking'; hpLowMidClear.frequency.value = 500; hpLowMidClear.Q.value = 0.5; hpLowMidClear.gain.value = -1.5;
+    // 2. Премахваме "глухотата" - малък спад само в "мътните" среди (400Hz)
+    const hpMudClear = audioContext.createBiquadFilter();
+    hpMudClear.type = 'peaking'; hpMudClear.frequency.value = 400; hpMudClear.Q.value = 0.6; hpMudClear.gain.value = -1.5;
 
-    // Mid-Range Natural Scoop (Намаляваме средите за по-малко агресия)
-    const hpMidScoop = audioContext.createBiquadFilter();
-    hpMidScoop.type = 'peaking'; hpMidScoop.frequency.value = 1000; hpMidScoop.Q.value = 0.4; hpMidScoop.gain.value = -2.0;
+    // 3. VOCAL PUNCH (2500Hz - 4500Hz) - тук "отпушваме" гласа
+    const hpVocalPresence = audioContext.createBiquadFilter();
+    hpVocalPresence.type = 'peaking'; hpVocalPresence.frequency.value = 3500; hpVocalPresence.Q.value = 0.8; hpVocalPresence.gain.value = 4.0;
 
-    // 2000Hz Definition (+2dB според твоето изискване за естествено присъствие)
-    const hpDefinition = audioContext.createBiquadFilter();
-    hpDefinition.type = 'peaking'; hpDefinition.frequency.value = 2000; hpDefinition.Q.value = 1.0; hpDefinition.gain.value = 2.0;
-
-    // Vocal Clarity (Намаляваме малко спрямо преди за по-естествен звук)
-    const hpVocalClarity = audioContext.createBiquadFilter();
-    hpVocalClarity.type = 'peaking'; hpVocalClarity.frequency.value = 4000; hpVocalClarity.Q.value = 1.0; hpVocalClarity.gain.value = 2.5;
-    
-    // High-End Air (По-плавен въздух, по-малко остри високи)
+    // 4. AIR & BRILLIANCE (12kHz shelf)
     const hpAir = audioContext.createBiquadFilter();
-    hpAir.type = 'highshelf'; hpAir.frequency.value = 10000; hpAir.gain.value = 3.0;
+    hpAir.type = 'highshelf'; hpAir.frequency.value = 11000; hpAir.gain.value = 4.0;
 
+    // 5. GAIN COMPENSATION - вдигаме я сериозно, за да няма спад в силата
     const hpCompensator = audioContext.createGain();
-    hpCompensator.gain.value = 1.2;
+    hpCompensator.gain.value = 1.6; // +4.1dB компенсация
 
     const hpSplit = audioContext.createChannelSplitter(2);
     
-    // Позициониране (Запазваме широката, но ефирна сцена)
+    // ПОЗИЦИОНИРАНЕ - по-близо и по-ясно
     const hpPanL = audioContext.createPanner(); 
     hpPanL.panningModel = 'HRTF'; 
-    hpPanL.positionX.value = -2.5; 
-    hpPanL.positionY.value = 0.5;  
-    hpPanL.positionZ.value = -1.4;
+    hpPanL.positionX.value = -2.2; // По-фокусирано стерео
+    hpPanL.positionY.value = 0.4;  // Леко над очите
+    hpPanL.positionZ.value = -1.1; // По-близо до теб за повече детайл
 
     const hpPanR = audioContext.createPanner(); 
     hpPanR.panningModel = 'HRTF'; 
-    hpPanR.positionX.value = 2.5; 
-    hpPanR.positionY.value = 0.5;  
-    hpPanR.positionZ.value = -1.4;
+    hpPanR.positionX.value = 2.2; 
+    hpPanR.positionY.value = 0.4;  
+    hpPanR.positionZ.value = -1.1;
 
+    // "Чиста" реверберация - само за високите
     const hpRev = audioContext.createConvolver();
     hpRev.buffer = impulseBuffer;
+    const hpRevFilter = audioContext.createBiquadFilter();
+    hpRevFilter.type = 'highpass'; hpRevFilter.frequency.value = 2500; // Режем ниското ехо
+    
     const hpRevGain = audioContext.createGain(); 
-    hpRevGain.gain.value = 0.06; // Малко по-дискретен реверб за по-натурално усещане
+    hpRevGain.gain.value = 0.08; 
 
-    // Свързване на веригата
+    // Свързване
     analyser.connect(hpGain)
-            .connect(hpWarmth)
-            .connect(hpLowMidClear)
-            .connect(hpMidScoop)
-            .connect(hpDefinition)
-            .connect(hpVocalClarity)
+            .connect(hpBass)
+            .connect(hpMudClear)
+            .connect(hpVocalPresence)
             .connect(hpAir)
             .connect(hpCompensator);
 
@@ -147,7 +142,8 @@ export function useAudioEngine() {
     hpSplit.connect(hpPanL, 0).connect(audioContext.destination);
     hpSplit.connect(hpPanR, 1).connect(audioContext.destination);
     
-    hpCompensator.connect(hpRev).connect(hpRevGain).connect(audioContext.destination);
+    // Ехото минава през High-pass филтър, за да не "зацапва"
+    hpCompensator.connect(hpRevFilter).connect(hpRev).connect(hpRevGain).connect(audioContext.destination);
     
     hpGainRef.current = hpGain;
     // --- 3. SPEAKERS MODE (MACBOOK WIDE TUNING - ВЪЗСТАНОВЕН!) ---
