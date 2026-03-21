@@ -14,6 +14,7 @@ export function App() {
   const [showEqualizer, setShowEqualizer] = useState(false);
   const [showShortcuts, setShowShortcuts] = useState(false);
 
+  // 1. Вземаме всичко от Music Player-а
   const {
     audioRef, playlist, state, currentTrack, isLoading,
     togglePlay, next, previous, seek, setVolume, toggleMute,
@@ -22,12 +23,14 @@ export function App() {
     handleTimeUpdate, handleLoadedMetadata, handleEnded, handleLoadStart,
   } = useMusicPlayer();
 
+  // 2. Вземаме всичко от Audio Engine-а
   const {
     analyserRef, connectAudioElement, setBandGain, applyPreset,
     equalizerGains, currentPreset, EQUALIZER_PRESETS, FREQUENCIES,
     spatialMode, changeSpatialMode, isSpatialLoaded,
   } = useAudioEngine();
 
+  // ФИКС: Тази функция свързва аудиото и активира бутона Spatial
   const onLoadedMetadata = useCallback(() => {
     handleLoadedMetadata();
     if (audioRef.current) {
@@ -56,10 +59,8 @@ export function App() {
               <p className="text-gray-400 text-sm">Hi-Fi Spatial Audio Player</p>
             </div>
             <div className="flex gap-2">
-              <button onClick={() => setShowShortcuts(true)} className="p-2 hover:bg-gray-800 rounded-full text-gray-400">
-                <kbd className="text-xs border border-gray-600 px-1.5 py-0.5 rounded">?</kbd>
-              </button>
-              <button onClick={() => setShowEqualizer(!showEqualizer)} className={`p-2 rounded-full transition-all ${showEqualizer ? 'bg-purple-600 text-white shadow-lg' : 'hover:bg-gray-800 text-gray-400'}`}>
+              <button onClick={() => setShowShortcuts(true)} className="p-2 hover:bg-gray-800 rounded-full text-gray-400"><kbd className="text-xs border border-gray-600 px-1.5 py-0.5 rounded">?</kbd></button>
+              <button onClick={() => setShowEqualizer(!showEqualizer)} className={`p-2 rounded-full transition-all ${showEqualizer ? 'bg-purple-600 text-white' : 'hover:bg-gray-800 text-gray-400'}`}>
                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 5h2M11 9h2M11 13h2M11 17h2M11 21h2M18 5h2M18 9h2M18 13h2M18 17h2M18 21h2M4 5h2M4 9h2M4 13h2M4 17h2M4 21h2"/></svg>
               </button>
             </div>
@@ -67,10 +68,7 @@ export function App() {
 
           <div className="relative group aspect-square lg:aspect-video bg-gray-900 rounded-3xl overflow-hidden shadow-2xl border border-white/5">
             <AlbumArt currentTrack={currentTrack} isPlaying={state.isPlaying} />
-            <div className="absolute inset-0 bg-gradient-to-t from-gray-950/80 via-transparent to-transparent opacity-60" />
-            <div className="absolute bottom-0 left-0 right-0 p-8">
-              <AudioVisualizer analyserRef={analyserRef} isPlaying={state.isPlaying} />
-            </div>
+            <div className="absolute bottom-0 left-0 right-0 p-8"><AudioVisualizer analyserRef={analyserRef} isPlaying={state.isPlaying} /></div>
           </div>
 
           <div className="space-y-1">
@@ -85,7 +83,7 @@ export function App() {
           )}
         </div>
 
-        {/* ДЯСНА СЕКЦИЯ: Качване и Плейлист (ТВОЯТА ВИЗИЯ) */}
+        {/* ДЯСНА СЕКЦИЯ: Качване и Плейлист (Твоята визия) */}
         <div className="lg:w-80 flex flex-col gap-6 h-[500px] lg:h-auto overflow-hidden">
           <FileUpload onUpload={addToPlaylist} />
           <Playlist tracks={playlist} currentTrackId={currentTrack?.id} isPlaying={state.isPlaying} onTrackSelect={playTrack} onRemoveTrack={removeFromPlaylist} onReorder={reorderPlaylist} />
@@ -96,22 +94,3 @@ export function App() {
         <div className="max-w-7xl mx-auto">
           <PlayerControls
             isPlaying={state.isPlaying} isLoading={isLoading} shuffle={state.shuffle} repeatMode={state.repeatMode} volume={state.volume} isMuted={state.isMuted} playbackRate={state.playbackRate} currentTime={state.currentTime} duration={state.duration}
-            onPlayPause={togglePlay} onPrevious={previous} onNext={next} onShuffle={toggleShuffle} onRepeat={toggleRepeat} onVolumeChange={setVolume} onMuteToggle={toggleMute} onPlaybackRateChange={setPlaybackRate} onSeek={seek}
-            spatialMode={spatialMode} onSpatialModeChange={changeSpatialMode} isSpatialLoaded={isSpatialLoaded}
-          />
-        </div>
-      </footer>
-
-      <audio ref={audioRef} onTimeUpdate={handleTimeUpdate} onLoadedMetadata={onLoadedMetadata} onEnded={handleEnded} onLoadStart={handleLoadStart} />
-      {showShortcuts && <ShortcutsModal onClose={() => setShowShortcuts(false)} />}
-      
-      <style>{`
-        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
-        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(139, 92, 246, 0.3); border-radius: 3px; }
-        .equalizer-slider::-webkit-slider-thumb { -webkit-appearance: none; height: 16px; width: 16px; border-radius: 50%; background: linear-gradient(135deg, #a855f7, #ec4899); cursor: pointer; margin-top: -6px; }
-        .equalizer-slider::-webkit-slider-runnable-track { width: 100%; height: 4px; cursor: pointer; background: rgba(255,255,255,0.1); border-radius: 2px; }
-      `}</style>
-    </div>
-  );
-}
