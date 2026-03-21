@@ -1,14 +1,9 @@
 import { useRef, useCallback, useState } from 'react';
 import { EqualizerPreset } from '@/types/music';
 
-export type SpatialMode = 'off' | 'headphones' | 'speakers';
+export type SpatialMode = 'off' | 'headphones' | 'speakers'; // Само тези три режима
 
 const FREQUENCIES = [32, 64, 125, 250, 500, 1000, 2000, 4000, 8000, 16000];
-
-export const EQUALIZER_PRESETS: EqualizerPreset[] = [
-  { name: 'Flat', gains: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0] },
-  { name: 'Bass Boost', gains: [8, 6, 4, 2, 0, 0, 0, 0, 0, 0] },
-];
 
 export function useAudioEngine() {
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -17,12 +12,12 @@ export function useAudioEngine() {
   const equalizerBandsRef = useRef<BiquadFilterNode[]>([]);
   const hpGainRef = useRef<GainNode | null>(null);
   const spGainRef = useRef<GainNode | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
   
   const [spatialMode, setSpatialMode] = useState<SpatialMode>('off');
   const [isSpatialLoaded, setIsSpatialLoaded] = useState(false);
   const [equalizerGains, setEqualizerGains] = useState<number[]>(new Array(10).fill(0));
   const [currentPreset, setCurrentPreset] = useState('Flat');
-  const analyserRef = useRef<AnalyserNode | null>(null);
 
   const initAudioContext = useCallback(() => {
     if (audioContextRef.current) return;
@@ -49,7 +44,6 @@ export function useAudioEngine() {
     lastNode.connect(hpGain);
     lastNode.connect(spGain);
     lastNode.connect(context.destination);
-    
     hpGain.connect(context.destination);
     spGain.connect(context.destination);
 
@@ -60,13 +54,13 @@ export function useAudioEngine() {
     spGainRef.current = spGain;
     
     gainNode.connect(analyser);
-    setIsSpatialLoaded(true);
+    setIsSpatialLoaded(true); // Активира бутоните
   }, []);
 
-  const connectAudioElement = useCallback((audio: HTMLAudioElement) => {
+  const connectAudioElement = useCallback((audio: HTMLSourceElement | HTMLAudioElement) => {
     if (!audioContextRef.current) initAudioContext();
     if (sourceRef.current) return;
-    const source = audioContextRef.current!.createMediaElementSource(audio);
+    const source = audioContextRef.current!.createMediaElementSource(audio as HTMLAudioElement);
     source.connect(gainNodeRef.current!);
     sourceRef.current = source;
   }, [initAudioContext]);
@@ -94,7 +88,11 @@ export function useAudioEngine() {
   return {
     analyserRef, connectAudioElement, setBandGain, equalizerGains,
     currentPreset, spatialMode, changeSpatialMode, isSpatialLoaded,
-    FREQUENCIES, EQUALIZER_PRESETS,
+    FREQUENCIES,
+    EQUALIZER_PRESETS: [
+      { name: 'Flat', gains: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0] },
+      { name: 'Bass Boost', gains: [8, 6, 4, 2, 0, 0, 0, 0, 0, 0] }
+    ],
     applyPreset: (preset: any) => {
       preset.gains.forEach((g: number, i: number) => setBandGain(i, g));
       setCurrentPreset(preset.name);
