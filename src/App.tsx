@@ -40,20 +40,21 @@ export function App() {
     handleLoadStart,
   } = useMusicPlayer();
 
-  const {
-    analyserRef,
-    initAudioContext,
-    connectAudioElement,
-    setBandGain,
-    applyPreset,
-    equalizerGains,
-    currentPreset,
-    EQUALIZER_PRESETS,
-    FREQUENCIES,
-    spatialMode,
-    changeSpatialMode,
-    irLoaded,
-  } = useAudioEngine();
+  // App.tsx - Горната част
+const {
+  analyserRef,
+  initAudioContext,
+  connectAudioElement,
+  setBandGain,
+  applyPreset,
+  equalizerGains,
+  currentPreset,
+  EQUALIZER_PRESETS,
+  FREQUENCIES,
+  spatialMode,
+  changeSpatialMode,
+  isSpatialLoaded, // Тук е само името на променливата
+} = useAudioEngine(); // Край на деструктурирането
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -215,7 +216,7 @@ export function App() {
               // ДОБАВИ ТЕЗИ 3 РЕДА (и премахни audioRef ако е там):
               spatialMode={spatialMode}
               onSpatialModeChange={changeSpatialMode}
-              isSpatialLoaded={irLoaded}
+              isSpatialLoaded={isSpatialLoaded}
             />
             </div>
 
