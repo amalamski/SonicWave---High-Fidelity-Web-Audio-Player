@@ -40,7 +40,7 @@ export function App() {
     handleLoadStart,
   } = useMusicPlayer();
 
-  // 2. Вземаме всичко от Audio Engine-а
+  // 2. Вземаме всичко от Audio Engine-а (Без Atmos)
   const {
     analyserRef,
     connectAudioElement,
@@ -55,7 +55,7 @@ export function App() {
     isSpatialLoaded,
   } = useAudioEngine();
 
-  // ФИКС: Свързваме аудиото, когато се зареди песен, за да се активира Spatial Audio
+  // ФИКС: Свързваме аудиото при зареждане на песен, за да се активира Spatial Audio
   const onLoadedMetadata = useCallback(() => {
     handleLoadedMetadata();
     if (audioRef.current) {
@@ -128,4 +128,80 @@ export function App() {
                 setGain={setBandGain}
                 presets={EQUALIZER_PRESETS}
                 onApplyPreset={applyPreset}
-                current
+                currentPreset={currentPreset}
+              />
+            </div>
+          )}
+        </div>
+
+        {/* ДЯСНА СЕКЦИЯ: Плейлист и Качване (Твоята визия) */}
+        <div className="lg:w-80 flex flex-col gap-6 h-[500px] lg:h-auto overflow-hidden">
+          <FileUpload onUpload={addToPlaylist} />
+          <Playlist
+            tracks={playlist}
+            currentTrackId={currentTrack?.id}
+            isPlaying={state.isPlaying}
+            onTrackSelect={playTrack}
+            onRemoveTrack={removeFromPlaylist}
+            onReorder={reorderPlaylist}
+          />
+        </div>
+      </main>
+
+      {/* ФУТЪР: Контроли */}
+      <footer className="bg-gray-900/50 backdrop-blur-xl border-t border-white/5 p-4 lg:p-6 sticky bottom-0 z-50">
+        <div className="max-w-7xl mx-auto">
+          <PlayerControls
+            isPlaying={state.isPlaying}
+            isLoading={isLoading}
+            shuffle={state.shuffle}
+            repeatMode={state.repeatMode}
+            volume={state.volume}
+            isMuted={state.isMuted}
+            playbackRate={state.playbackRate}
+            currentTime={state.currentTime}
+            duration={state.duration}
+            onPlayPause={togglePlay}
+            onPrevious={previous}
+            onNext={next}
+            onShuffle={toggleShuffle}
+            onRepeat={toggleRepeat}
+            onVolumeChange={setVolume}
+            onMuteToggle={toggleMute}
+            onPlaybackRateChange={setPlaybackRate}
+            onSeek={seek}
+            spatialMode={spatialMode}
+            onSpatialModeChange={changeSpatialMode}
+            isSpatialLoaded={isSpatialLoaded}
+          />
+        </div>
+      </footer>
+
+      <audio
+        ref={audioRef}
+        onTimeUpdate={handleTimeUpdate}
+        onLoadedMetadata={onLoadedMetadata}
+        onEnded={handleEnded}
+        onLoadStart={handleLoadStart}
+      />
+
+      {showShortcuts && <ShortcutsModal onClose={() => setShowShortcuts(false)} />}
+
+      <style>{`
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(139, 92, 246, 0.3); border-radius: 3px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(139, 92, 246, 0.5); }
+        .equalizer-slider { -webkit-appearance: none; background: transparent; }
+        .equalizer-slider::-webkit-slider-thumb {
+          -webkit-appearance: none; height: 16px; width: 16px; border-radius: 50%;
+          background: linear-gradient(135deg, #a855f7, #ec4899); cursor: pointer;
+          margin-top: -6px; box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+        .equalizer-slider::-webkit-slider-runnable-track {
+          width: 100%; height: 4px; cursor: pointer; background: rgba(255,255,255,0.1); border-radius: 2px;
+        }
+      `}</style>
+    </div>
+  );
+}
