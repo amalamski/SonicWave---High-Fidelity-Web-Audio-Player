@@ -14,14 +14,13 @@ export function App() {
   const [showEqualizer, setShowEqualizer] = useState(false);
   const [showShortcuts, setShowShortcuts] = useState(false);
 
-  // Вземаме всичко от Music Player-а - БЕЗ СЪКРАЩЕНИЯ
+  // 1. Вземаме всичко от Music Player-а точно както беше в началото
   const {
     audioRef,
     playlist,
     state,
     currentTrack,
     isLoading,
-    play,
     togglePlay,
     next,
     previous,
@@ -32,7 +31,7 @@ export function App() {
     toggleShuffle,
     toggleRepeat,
     playTrack,
-    addToPlaylist, // ГАРАНТИРАНО ТУК ЗА ФАЙЛОВЕТЕ
+    addToPlaylist, // ТОВА ТРЯБВА ДА Е ТУК ЗА FILE UPLOAD
     removeFromPlaylist,
     reorderPlaylist,
     handleTimeUpdate,
@@ -41,7 +40,7 @@ export function App() {
     handleLoadStart,
   } = useMusicPlayer();
 
-  // Вземаме всичко от Audio Engine-а
+  // 2. Вземаме всичко от Audio Engine-а
   const {
     analyserRef,
     connectAudioElement,
@@ -56,14 +55,15 @@ export function App() {
     isSpatialLoaded,
   } = useAudioEngine();
 
-  // ФИКС за Atmos: Свързваме аудиото при зареждане на песен
+  // 3. ФУНКЦИЯ ЗА СВЪРЗВАНЕ: Извиква се автоматично при зареждане на песен
   const onLoadedMetadata = useCallback(() => {
-    handleLoadedMetadata();
+    handleLoadedMetadata(); // Важно за времетраенето
     if (audioRef.current) {
-      connectAudioElement(audioRef.current);
+      connectAudioElement(audioRef.current); // Активира Atmos/Spatial
     }
   }, [handleLoadedMetadata, connectAudioElement, audioRef]);
 
+  // Клавишни преки пътища
   useKeyboardShortcuts({
     onPlayPause: togglePlay,
     onNext: next,
@@ -81,7 +81,7 @@ export function App() {
     <div className="min-h-screen bg-gray-950 text-gray-100 flex flex-col font-sans selection:bg-purple-500/30">
       <main className="flex-1 flex flex-col lg:flex-row p-4 lg:p-8 gap-8 max-w-7xl mx-auto w-full overflow-hidden">
         
-        {/* ЛЯВА СТРАНА: Трак и Визуализация */}
+        {/* ЛЯВА СЕКЦИЯ: Трак и Визуализация */}
         <div className="flex-1 flex flex-col gap-6 min-w-0">
           <div className="flex items-center justify-between">
             <div>
@@ -103,7 +103,7 @@ export function App() {
                 className={`p-2 rounded-full transition-all ${
                   showEqualizer ? 'bg-purple-600 text-white shadow-lg shadow-purple-500/20' : 'hover:bg-gray-800 text-gray-400'
                 }`}
-                title="Equalizer & Spatial"
+                title="Equalizer & Spatial Audio"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 5h2M11 9h2M11 13h2M11 17h2M11 21h2M18 5h2M18 9h2M18 13h2M18 17h2M18 21h2M4 5h2M4 9h2M4 13h2M4 17h2M4 21h2"/></svg>
               </button>
@@ -137,7 +137,7 @@ export function App() {
           )}
         </div>
 
-        {/* ДЯСНА СТРАНА: Качване и Плейлист (Оригинален лейаут) */}
+        {/* ДЯСНА СЕКЦИЯ: Качване и Плейлист (Оригинален лейаут) */}
         <div className="lg:w-80 flex flex-col gap-6 h-[500px] lg:h-auto">
           <FileUpload onUpload={addToPlaylist} />
           <Playlist
@@ -151,7 +151,7 @@ export function App() {
         </div>
       </main>
 
-      {/* ФУТЪР: Пълен контрол панел */}
+      {/* ФУТЪР: Контроли */}
       <footer className="bg-gray-900/50 backdrop-blur-xl border-t border-white/5 p-4 lg:p-6 sticky bottom-0 z-50">
         <div className="max-w-7xl mx-auto">
           <PlayerControls
@@ -180,6 +180,7 @@ export function App() {
         </div>
       </footer>
 
+      {/* АУДИО ЕЛЕМЕНТ */}
       <audio
         ref={audioRef}
         onTimeUpdate={handleTimeUpdate}
@@ -190,7 +191,7 @@ export function App() {
 
       {showShortcuts && <ShortcutsModal onClose={() => setShowShortcuts(false)} />}
 
-      {/* Твоите CSS стилове - без промяна */}
+      {/* ТВОИТЕ CSS СТИЛОВЕ */}
       <style>{`
         .custom-scrollbar::-webkit-scrollbar { width: 6px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
