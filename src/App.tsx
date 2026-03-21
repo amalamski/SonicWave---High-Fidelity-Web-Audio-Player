@@ -14,7 +14,7 @@ export function App() {
   const [showEqualizer, setShowEqualizer] = useState(false);
   const [showShortcuts, setShowShortcuts] = useState(false);
 
-  // Вземаме всичко от Music Player-а точно както беше
+  // 1. Вземаме всичко от Music Player-а (ВАЖНО за качването)
   const {
     audioRef,
     playlist,
@@ -31,7 +31,7 @@ export function App() {
     toggleShuffle,
     toggleRepeat,
     playTrack,
-    addToPlaylist,
+    addToPlaylist, // Тази функция оправя грешката 'f is not a function'
     removeFromPlaylist,
     reorderPlaylist,
     handleTimeUpdate,
@@ -40,7 +40,7 @@ export function App() {
     handleLoadStart,
   } = useMusicPlayer();
 
-  // Вземаме всичко от Audio Engine-а
+  // 2. Вземаме всичко от Audio Engine-а
   const {
     analyserRef,
     connectAudioElement,
@@ -55,7 +55,7 @@ export function App() {
     isSpatialLoaded,
   } = useAudioEngine();
 
-  // ФИКСЪТ: Свързваме двата свята тук, за да заработи Atmos бутона
+  // 3. ФИКСЪТ: Свързваме аудиото, без да променяме визията
   const onLoadedMetadata = useCallback(() => {
     handleLoadedMetadata();
     if (audioRef.current) {
@@ -80,7 +80,7 @@ export function App() {
     <div className="min-h-screen bg-gray-950 text-gray-100 flex flex-col font-sans selection:bg-purple-500/30">
       <main className="flex-1 flex flex-col lg:flex-row p-4 lg:p-8 gap-8 max-w-7xl mx-auto w-full overflow-hidden">
         
-        {/* ЛЯВА СЕКЦИЯ */}
+        {/* ЛЯВА СЕКЦИЯ: Плеър и Визуализация */}
         <div className="flex-1 flex flex-col gap-6 min-w-0">
           <div className="flex items-center justify-between">
             <div>
@@ -99,7 +99,7 @@ export function App() {
               <button
                 onClick={() => setShowEqualizer(!showEqualizer)}
                 className={`p-2 rounded-full transition-all ${
-                  showEqualizer ? 'bg-purple-600 text-white shadow-lg shadow-purple-500/20' : 'hover:bg-gray-800 text-gray-400'
+                  showEqualizer ? 'bg-purple-600 text-white shadow-lg' : 'hover:bg-gray-800 text-gray-400'
                 }`}
               >
                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 5h2M11 9h2M11 13h2M11 17h2M11 21h2M18 5h2M18 9h2M18 13h2M18 17h2M18 21h2M4 5h2M4 9h2M4 13h2M4 17h2M4 21h2"/></svg>
@@ -134,7 +134,7 @@ export function App() {
           )}
         </div>
 
-        {/* ДЯСНА СЕКЦИЯ: Плейлист и Качване */}
+        {/* ДЯСНА СЕКЦИЯ: Качване и Плейлист (ТВОЯТА ОРИГИНАЛНА ВИЗИЯ) */}
         <div className="lg:w-80 flex flex-col gap-6 h-[500px] lg:h-auto">
           <FileUpload onUpload={addToPlaylist} />
           <Playlist
@@ -148,7 +148,7 @@ export function App() {
         </div>
       </main>
 
-      {/* КОНТРОЛИ (ФУТЪР) */}
+      {/* ФУТЪР: Контроли */}
       <footer className="bg-gray-900/50 backdrop-blur-xl border-t border-white/5 p-4 lg:p-6 sticky bottom-0 z-50">
         <div className="max-w-7xl mx-auto">
           <PlayerControls
