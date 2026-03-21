@@ -211,18 +211,18 @@ export function useAudioEngine() {
     setCurrentPreset(preset.name);
   }, [setBandGain]);
 
-  return {
-  analyserRef, 
-  initAudioContext, 
-  connectAudioElement, 
-  setBandGain, 
-  applyPreset,
-  equalizerGains, 
-  currentPreset, 
-  EQUALIZER_PRESETS, 
-  FREQUENCIES,
-  spatialMode, 
-  changeSpatialMode, 
-  isSpatialLoaded // <--- ПРОВЕРИ ТОВА
-};
+ return {
+    analyserRef,
+    initAudioContext,
+    connectAudioElement,
+    setBandGain,
+    applyPreset,
+    equalizerGains,
+    currentPreset,
+    EQUALIZER_PRESETS,
+    FREQUENCIES,
+    spatialMode,
+    changeSpatialMode,
+    isSpatialLoaded // <--- ДОБАВИ ТОЗИ РЕД ТУК!
+  };
 }
