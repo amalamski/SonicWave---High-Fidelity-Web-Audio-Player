@@ -1,9 +1,15 @@
-import { useRef, useCallback, useEffect, useState } from 'react';
+import { useRef, useCallback, useState } from 'react';
 import { EqualizerPreset } from '@/types/music';
 
-export type SpatialMode = 'off' | 'headphones' | 'speakers'; // Atmos е премахнат
+export type SpatialMode = 'off' | 'headphones' | 'speakers'; // Само тези три режима
 
 const FREQUENCIES = [32, 64, 125, 250, 500, 1000, 2000, 4000, 8000, 16000];
+
+export const EQUALIZER_PRESETS: EqualizerPreset[] = [
+  { name: 'Flat', gains: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0] },
+  { name: 'Bass Boost', gains: [8, 6, 4, 2, 0, 0, 0, 0, 0, 0] },
+  { name: 'Treble Boost', gains: [0, 0, 0, 0, 0, 2, 4, 6, 8, 10] },
+];
 
 export function useAudioEngine() {
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -21,26 +27,22 @@ export function useAudioEngine() {
 
   const initAudioContext = useCallback(() => {
     if (audioContextRef.current) return;
-    
     const context = new (window.AudioContext || (window as any).webkitAudioContext)();
     const gainNode = context.createGain();
     const analyser = context.createAnalyser();
     analyser.fftSize = 256;
 
-    // Свързване на Еквалайзера
     let lastNode: AudioNode = gainNode;
     FREQUENCIES.forEach((freq) => {
       const filter = context.createBiquadFilter();
       filter.type = 'peaking';
       filter.frequency.value = freq;
-      filter.Q.value = 1;
       filter.gain.value = 0;
       lastNode.connect(filter);
       equalizerBandsRef.current.push(filter);
       lastNode = filter;
     });
 
-    // Spatial Audio Nodes
     const hpGain = context.createGain();
     const spGain = context.createGain();
     hpGain.gain.value = 0;
@@ -48,7 +50,7 @@ export function useAudioEngine() {
 
     lastNode.connect(hpGain);
     lastNode.connect(spGain);
-    lastNode.connect(context.destination); // "Off" path
+    lastNode.connect(context.destination);
     
     hpGain.connect(context.destination);
     spGain.connect(context.destination);
@@ -63,28 +65,24 @@ export function useAudioEngine() {
     setIsSpatialLoaded(true);
   }, []);
 
-  const changeSpatialMode = useCallback((newMode: SpatialMode) => {
-    if (!audioContextRef.current) return;
-    const now = audioContextRef.current.currentTime;
-    const fade = 0.2;
-
-    [hpGainRef, spGainRef].forEach(ref => {
-      if (ref.current) ref.current.gain.linearRampToValueAtTime(0, now + fade);
-    });
-
-    if (newMode === 'headphones' && hpGainRef.current) hpGainRef.current.gain.linearRampToValueAtTime(1, now + fade);
-    if (newMode === 'speakers' && spGainRef.current) spGainRef.current.gain.linearRampToValueAtTime(1, now + fade);
-
-    setSpatialMode(newMode);
-  }, []);
-
   const connectAudioElement = useCallback((audio: HTMLAudioElement) => {
     if (!audioContextRef.current) initAudioContext();
-    if (sourceRef.current) return; // Вече свързан
+    if (sourceRef.current) return;
     const source = audioContextRef.current!.createMediaElementSource(audio);
     source.connect(gainNodeRef.current!);
     sourceRef.current = source;
   }, [initAudioContext]);
+
+  const changeSpatialMode = useCallback((newMode: SpatialMode) => {
+    if (!audioContextRef.current) return;
+    const now = audioContextRef.current.currentTime;
+    [hpGainRef, spGainRef].forEach(ref => {
+      if (ref.current) ref.current.gain.linearRampToValueAtTime(0, now + 0.2);
+    });
+    if (newMode === 'headphones' && hpGainRef.current) hpGainRef.current.gain.linearRampToValueAtTime(1, now + 0.2);
+    if (newMode === 'speakers' && spGainRef.current) spGainRef.current.gain.linearRampToValueAtTime(1, now + 0.2);
+    setSpatialMode(newMode);
+  }, []);
 
   const setBandGain = useCallback((bandIndex: number, gain: number) => {
     if (equalizerBandsRef.current[bandIndex]) {
@@ -95,20 +93,14 @@ export function useAudioEngine() {
     }
   }, []);
 
+  const applyPreset = useCallback((preset: EqualizerPreset) => {
+    preset.gains.forEach((g, i) => setBandGain(i, g));
+    setCurrentPreset(preset.name);
+  }, [setBandGain]);
+
   return {
-    analyserRef,
-    connectAudioElement,
-    setBandGain,
-    equalizerGains,
-    currentPreset,
-    spatialMode,
-    changeSpatialMode,
-    isSpatialLoaded,
-    FREQUENCIES,
-    EQUALIZER_PRESETS: [
-        { name: 'Flat', gains: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0] },
-        { name: 'Bass Boost', gains: [8, 6, 4, 2, 0, 0, 0, 0, 0, 0] }
-    ],
-    applyPreset: (preset: any) => preset.gains.forEach((g: any, i: any) => setBandGain(i, g))
+    analyserRef, connectAudioElement, setBandGain, applyPreset,
+    equalizerGains, currentPreset, spatialMode, changeSpatialMode,
+    isSpatialLoaded, FREQUENCIES, EQUALIZER_PRESETS
   };
 }
