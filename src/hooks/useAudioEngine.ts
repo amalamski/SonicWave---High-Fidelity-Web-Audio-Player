@@ -1,7 +1,8 @@
 import { useRef, useCallback, useEffect, useState } from 'react';
 import { EqualizerPreset } from '@/types/music';
 
-export type SpatialMode = 'off' | 'headphones' | 'speakers';
+// Дефинираме режимите, включително новия Atmos
+export type SpatialMode = 'off' | 'headphones' | 'speakers' | 'atmos';
 
 const FREQUENCIES = [32, 64, 125, 250, 500, 1000, 2000, 4000, 8000, 16000];
 
@@ -25,14 +26,16 @@ export function useAudioEngine() {
   const equalizerBandsRef = useRef<BiquadFilterNode[]>([]);
   const gainNodeRef = useRef<GainNode | null>(null);
   
+  // Референции за различните изходни вериги
   const dryGainRef = useRef<GainNode | null>(null);
   const hpGainRef = useRef<GainNode | null>(null);
   const spGainRef = useRef<GainNode | null>(null);
+  const atmosGainRef = useRef<GainNode | null>(null);
 
   const [equalizerGains, setEqualizerGains] = useState<number[]>(new Array(10).fill(0));
   const [currentPreset, setCurrentPreset] = useState<string>('Flat');
   const [spatialMode, setSpatialMode] = useState<SpatialMode>('off');
-  const [irLoaded, setIrLoaded] = useState(false);
+  const [isSpatialLoaded, setIsSpatialLoaded] = useState(false);
 
   const initAudioContext = useCallback(() => {
     if (audioContextRef.current) return;
@@ -47,6 +50,7 @@ export function useAudioEngine() {
     const gainNode = audioContext.createGain();
     gainNodeRef.current = gainNode;
 
+    // Инициализация на Еквалайзера
     const bands = FREQUENCIES.map((freq) => {
       const filter = audioContext.createBiquadFilter();
       filter.type = 'peaking';
@@ -64,7 +68,7 @@ export function useAudioEngine() {
     });
     lastNode.connect(analyser);
 
-    // --- IR GENERATION (Rich Studio Response) ---
+    // Генериране на Impulse Response за Reverb
     const duration = 0.6; 
     const sampleRate = audioContext.sampleRate;
     const length = sampleRate * duration;
@@ -77,109 +81,99 @@ export function useAudioEngine() {
       right[i] = (Math.random() * 2 - 1) * factor;
     }
 
+    // --- 1. DRY MODE (Стандартно Стерео) ---
     const dryGain = audioContext.createGain();
     dryGain.gain.value = 1;
     analyser.connect(dryGain).connect(audioContext.destination);
     dryGainRef.current = dryGain;
 
-    // --- 2. HEADPHONES MODE (HIGH-CLARITY & POWER TUNING) ---
+    // --- 2. HEADPHONES MODE (Harman Tuning + Vocal Clarity) ---
     const hpGain = audioContext.createGain();
     hpGain.gain.value = 0; 
+    const hpBass = audioContext.createBiquadFilter(); hpBass.type = 'lowshelf'; hpBass.frequency.value = 110; hpBass.gain.value = 4.5;
+    const hpVocal = audioContext.createBiquadFilter(); hpVocal.type = 'peaking'; hpVocal.frequency.value = 3500; hpVocal.gain.value = 4.0;
+    const hpAir = audioContext.createBiquadFilter(); hpAir.type = 'highshelf'; hpAir.frequency.value = 11000; hpAir.gain.value = 4.5;
+    const hpCompensator = audioContext.createGain(); hpCompensator.gain.value = 1.65; // +4.3dB Match
     
-    // 1. Плътен, но контролиран бас (110Hz)
-    const hpBass = audioContext.createBiquadFilter();
-    hpBass.type = 'lowshelf'; hpBass.frequency.value = 110; hpBass.gain.value = 4.5;
-
-    // 2. Премахваме "глухотата" - малък спад само в "мътните" среди (400Hz)
-    const hpMudClear = audioContext.createBiquadFilter();
-    hpMudClear.type = 'peaking'; hpMudClear.frequency.value = 400; hpMudClear.Q.value = 0.6; hpMudClear.gain.value = -1.5;
-
-    // 3. VOCAL PUNCH (2500Hz - 4500Hz) - тук "отпушваме" гласа
-    const hpVocalPresence = audioContext.createBiquadFilter();
-    hpVocalPresence.type = 'peaking'; hpVocalPresence.frequency.value = 3500; hpVocalPresence.Q.value = 0.8; hpVocalPresence.gain.value = 4.0;
-
-    // 4. AIR & BRILLIANCE (12kHz shelf)
-    const hpAir = audioContext.createBiquadFilter();
-    hpAir.type = 'highshelf'; hpAir.frequency.value = 11000; hpAir.gain.value = 4.0;
-
-    // 5. GAIN COMPENSATION - вдигаме я сериозно, за да няма спад в силата
-    const hpCompensator = audioContext.createGain();
-    hpCompensator.gain.value = 1.6; // +4.1dB компенсация
-
     const hpSplit = audioContext.createChannelSplitter(2);
+    const hpPanL = audioContext.createPanner(); hpPanL.panningModel = 'HRTF'; hpPanL.positionX.value = -2.2; hpPanL.positionY.value = 0.4; hpPanL.positionZ.value = -1.1;
+    const hpPanR = audioContext.createPanner(); hpPanR.panningModel = 'HRTF'; hpPanR.positionX.value = 2.2; hpPanR.positionY.value = 0.4; hpPanR.positionZ.value = -1.1;
     
-    // ПОЗИЦИОНИРАНЕ - по-близо и по-ясно
-    const hpPanL = audioContext.createPanner(); 
-    hpPanL.panningModel = 'HRTF'; 
-    hpPanL.positionX.value = -2.2; // По-фокусирано стерео
-    hpPanL.positionY.value = 0.4;  // Леко над очите
-    hpPanL.positionZ.value = -1.1; // По-близо до теб за повече детайл
-
-    const hpPanR = audioContext.createPanner(); 
-    hpPanR.panningModel = 'HRTF'; 
-    hpPanR.positionX.value = 2.2; 
-    hpPanR.positionY.value = 0.4;  
-    hpPanR.positionZ.value = -1.1;
-
-    // "Чиста" реверберация - само за високите
-    const hpRev = audioContext.createConvolver();
-    hpRev.buffer = impulseBuffer;
-    const hpRevFilter = audioContext.createBiquadFilter();
-    hpRevFilter.type = 'highpass'; hpRevFilter.frequency.value = 2500; // Режем ниското ехо
-    
-    const hpRevGain = audioContext.createGain(); 
-    hpRevGain.gain.value = 0.08; 
-
-    // Свързване
-    analyser.connect(hpGain)
-            .connect(hpBass)
-            .connect(hpMudClear)
-            .connect(hpVocalPresence)
-            .connect(hpAir)
-            .connect(hpCompensator);
-
+    analyser.connect(hpGain).connect(hpBass).connect(hpVocal).connect(hpAir).connect(hpCompensator);
     hpCompensator.connect(hpSplit);
     hpSplit.connect(hpPanL, 0).connect(audioContext.destination);
     hpSplit.connect(hpPanR, 1).connect(audioContext.destination);
-    
-    // Ехото минава през High-pass филтър, за да не "зацапва"
-    hpCompensator.connect(hpRevFilter).connect(hpRev).connect(hpRevGain).connect(audioContext.destination);
-    
     hpGainRef.current = hpGain;
-    // --- 3. SPEAKERS MODE (MACBOOK WIDE TUNING - ВЪЗСТАНОВЕН!) ---
+
+    // --- 3. SPEAKERS MODE (Ultra-Wide Virtual Surround) ---
     const spGain = audioContext.createGain();
     spGain.gain.value = 0; 
-    const spBass = audioContext.createBiquadFilter(); spBass.type = 'lowshelf'; spBass.frequency.value = 200; spBass.gain.value = 5;
-    const spTreble = audioContext.createBiquadFilter(); spTreble.type = 'highshelf'; spTreble.frequency.value = 4000; spTreble.gain.value = 4;
-    const spComp = audioContext.createDynamicsCompressor(); spComp.threshold.value = -22; spComp.ratio.value = 4;
-    const spSplit = audioContext.createChannelSplitter(2);
+    const spCompNode = audioContext.createDynamicsCompressor(); spCompNode.threshold.value = -22; spCompNode.ratio.value = 4;
     const spPanL = audioContext.createPanner(); spPanL.panningModel = 'equalpower'; spPanL.positionX.value = -3.5;
     const spPanR = audioContext.createPanner(); spPanR.panningModel = 'equalpower'; spPanR.positionX.value = 3.5;
-    const spRev = audioContext.createConvolver(); spRev.buffer = impulseBuffer;
-    const spRevGain = audioContext.createGain(); spRevGain.gain.value = 0.12;
-
-    analyser.connect(spGain).connect(spBass).connect(spTreble);
-    spTreble.connect(spSplit);
-    spSplit.connect(spPanL, 0).connect(spComp);
-    spSplit.connect(spPanR, 1).connect(spComp);
-    spTreble.connect(spComp); // Phantom center
-    spTreble.connect(spRev).connect(spRevGain).connect(spComp);
-    spComp.connect(audioContext.destination);
+    
+    analyser.connect(spGain).connect(spCompNode);
+    spCompNode.connect(spPanL).connect(audioContext.destination);
+    spCompNode.connect(spPanR).connect(audioContext.destination);
     spGainRef.current = spGain;
 
-    setIrLoaded(true);
+    // --- 4. ✨ DOLBY ATMOS SIMULATION (7.1.4) ---
+    const atmosGain = audioContext.createGain();
+    atmosGain.gain.value = 0;
+    const atmosCompensator = audioContext.createGain();
+    atmosCompensator.gain.value = 1.8; // Мощна компенсация за обгръщащ звук
+
+    // 7-канална основа + 4 височинни канала
+    const atmosPositions = [
+      { x: -1.5, y: 2, z: -1 }, { x: 1.5, y: 2, z: -1 }, // Front Height
+      { x: -2, y: 0.5, z: 0 }, { x: 2, y: 0.5, z: 0 },   // Sides
+      { x: 0, y: 0.5, z: -2 }, // Center
+      { x: -1.2, y: 0, z: 1.5 }, { x: 1.2, y: 0, z: 1.5 } // Rear
+    ];
+
+    analyser.connect(atmosGain);
+    atmosPositions.forEach(pos => {
+      const panner = audioContext.createPanner();
+      panner.panningModel = 'HRTF';
+      panner.positionX.value = pos.x;
+      panner.positionY.value = pos.y;
+      panner.positionZ.value = pos.z;
+      atmosGain.connect(panner).connect(atmosCompensator);
+    });
+
+    // LFE (Subwoofer)
+    const lfe = audioContext.createBiquadFilter();
+    lfe.type = 'lowpass'; lfe.frequency.value = 80;
+    atmosGain.connect(lfe).connect(atmosCompensator);
+
+    atmosCompensator.connect(audioContext.destination);
+    atmosGainRef.current = atmosGain;
+
+    setIsSpatialLoaded(true);
   }, []);
 
   const changeSpatialMode = useCallback((newMode: SpatialMode) => {
     const audioCtx = audioContextRef.current;
-    if (!audioCtx || !dryGainRef.current || !hpGainRef.current || !spGainRef.current) return;
+    if (!audioCtx || !dryGainRef.current || !hpGainRef.current || !spGainRef.current || !atmosGainRef.current) return;
     if (audioCtx.state === 'suspended') audioCtx.resume();
+
     const now = audioCtx.currentTime;
     const fade = 0.4;
-    [dryGainRef, hpGainRef, spGainRef].forEach(ref => ref.current?.gain.setValueAtTime(ref.current.gain.value, now));
-    dryGainRef.current.gain.linearRampToValueAtTime(newMode === 'off' ? 1 : 0, now + fade);
-    hpGainRef.current.gain.linearRampToValueAtTime(newMode === 'headphones' ? 1 : 0, now + fade);
-    spGainRef.current.gain.linearRampToValueAtTime(newMode === 'speakers' ? 1 : 0, now + fade);
+
+    // Плавно затихване на всички вериги
+    [dryGainRef, hpGainRef, spGainRef, atmosGainRef].forEach(ref => {
+      if (ref.current) {
+        ref.current.gain.setValueAtTime(ref.current.gain.value, now);
+        ref.current.gain.linearRampToValueAtTime(0, now + fade);
+      }
+    });
+
+    // Плавно активиране на избраната верига
+    if (newMode === 'off' && dryGainRef.current) dryGainRef.current.gain.linearRampToValueAtTime(1, now + fade);
+    if (newMode === 'headphones' && hpGainRef.current) hpGainRef.current.gain.linearRampToValueAtTime(1, now + fade);
+    if (newMode === 'speakers' && spGainRef.current) spGainRef.current.gain.linearRampToValueAtTime(1, now + fade);
+    if (newMode === 'atmos' && atmosGainRef.current) atmosGainRef.current.gain.linearRampToValueAtTime(1, now + fade);
+
     setSpatialMode(newMode);
   }, []);
 
@@ -208,6 +202,6 @@ export function useAudioEngine() {
   return {
     analyserRef, initAudioContext, connectAudioElement, setBandGain, applyPreset,
     equalizerGains, currentPreset, EQUALIZER_PRESETS, FREQUENCIES,
-    spatialMode, changeSpatialMode, irLoaded
+    spatialMode, changeSpatialMode, isSpatialLoaded
   };
 }
