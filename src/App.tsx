@@ -1,0 +1,371 @@
+import { useState, useEffect, useCallback } from 'react';
+import { useMusicPlayer } from '@/hooks/useMusicPlayer';
+import { useAudioEngine } from '@/hooks/useAudioEngine';
+import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
+import { AlbumArt } from '@/components/AlbumArt';
+import { PlayerControls } from '@/components/PlayerControls';
+import { Playlist } from '@/components/Playlist';
+import { Equalizer } from '@/components/Equalizer';
+import { AudioVisualizer } from '@/components/AudioVisualizer';
+import { FileUpload } from '@/components/FileUpload';
+import { ShortcutsModal } from '@/components/ShortcutsModal';
+import { SpatialAudio } from '@/components/SpatialAudio';
+
+export function App() {
+  const [showEqualizer, setShowEqualizer] = useState(false);
+  const [showShortcuts, setShowShortcuts] = useState(false);
+  const [showSpatial, setShowSpatial] = useState(false);
+
+  const {
+    audioRef,
+    playlist,
+    state,
+    currentTrack,
+    isLoading,
+    play,
+    togglePlay,
+    next,
+    previous,
+    seek,
+    setVolume,
+    toggleMute,
+    setPlaybackRate,
+    toggleShuffle,
+    toggleRepeat,
+    playTrack,
+    addToPlaylist,
+    removeFromPlaylist,
+    reorderPlaylist,
+    handleTimeUpdate,
+    handleLoadedMetadata,
+    handleEnded,
+    handleLoadStart,
+  } = useMusicPlayer();
+
+  const {
+    analyserRef,
+    initAudioContext,
+    connectAudioElement,
+    setBandGain,
+    applyPreset,
+    equalizerGains,
+    currentPreset,
+    EQUALIZER_PRESETS,
+    FREQUENCIES,
+    spatialMode,
+    currentSpatialPreset,
+    applySpatialPreset,
+    SPATIAL_PRESETS,
+  } = useAudioEngine();
+
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (audio) {
+      // КРИТИЧЕН ФИКС 1: Премахнато { once: true }
+      // Вече функцията се изпълнява при ВСЯКО пускане на нова песен.
+      // Това буди аудио контекста и гарантира, че ефектите няма да "заспят".
+      const handlePlay = () => {
+        initAudioContext();
+        connectAudioElement(audio);
+      };
+      
+      audio.addEventListener('play', handlePlay);
+      return () => audio.removeEventListener('play', handlePlay);
+    }
+  }, [audioRef, initAudioContext, connectAudioElement]);
+
+  const handleVolumeUp = useCallback(() => {
+    setVolume(Math.min(state.volume + 0.1, 1));
+  }, [setVolume, state.volume]);
+
+  const handleVolumeDown = useCallback(() => {
+    setVolume(Math.max(state.volume - 0.1, 0));
+  }, [setVolume, state.volume]);
+
+  const handleSeekForward = useCallback(() => {
+    seek(Math.min(state.currentTime + 5, state.duration));
+  }, [seek, state.currentTime, state.duration]);
+
+  const handleSeekBackward = useCallback(() => {
+    seek(Math.max(state.currentTime - 5, 0));
+  }, [seek, state.currentTime]);
+
+  const { shortcuts } = useKeyboardShortcuts({
+    onPlayPause: togglePlay,
+    onNext: next,
+    onPrevious: previous,
+    onVolumeUp: handleVolumeUp,
+    onVolumeDown: handleVolumeDown,
+    onMute: toggleMute,
+    onSeekForward: handleSeekForward,
+    onSeekBackward: handleSeekBackward,
+    onToggleShuffle: toggleShuffle,
+    onToggleRepeat: toggleRepeat,
+  });
+
+  const handleFilesAdded = useCallback((tracks: unknown[]) => {
+    tracks.forEach((track) => addToPlaylist(track as any));
+  }, [addToPlaylist]);
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900/20 to-gray-900 text-white">
+      {/* Hidden Audio Element */}
+      <audio
+        ref={audioRef}
+        crossOrigin="anonymous" /* КРИТИЧЕН ФИКС 2: Позволява на Web Audio API да обработва звука при смяна на файл */
+        src={currentTrack?.url}
+        onTimeUpdate={handleTimeUpdate}
+        onLoadedMetadata={handleLoadedMetadata}
+        onEnded={handleEnded}
+        onLoadStart={handleLoadStart}
+        onCanPlay={() => isLoading && play()}
+      />
+
+      {/* Header */}
+      <header className="sticky top-0 z-40 backdrop-blur-lg bg-gray-900/50 border-b border-gray-800">
+        <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
+              <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z" />
+              </svg>
+            </div>
+            <div>
+              <h1 className="text-xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
+                SonicWave
+              </h1>
+              <p className="text-xs text-gray-500">Music Player</p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowSpatial(!showSpatial)}
+              className={`p-2 rounded-lg transition-colors ${showSpatial || spatialMode !== 'off' ? 'text-purple-400 bg-purple-500/20' : 'text-gray-400 hover:text-white hover:bg-gray-800'}`}
+              title="Spatial Audio"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z" />
+              </svg>
+            </button>
+            <button
+              onClick={() => setShowEqualizer(!showEqualizer)}
+              className={`p-2 rounded-lg transition-colors ${showEqualizer ? 'text-purple-400 bg-purple-500/20' : 'text-gray-400 hover:text-white hover:bg-gray-800'}`}
+              title="Equalizer"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+              </svg>
+            </button>
+            <button
+              onClick={() => setShowShortcuts(true)}
+              className="p-2 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800 transition-colors"
+              title="Keyboard Shortcuts"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      </header>
+
+      {/* Main Content */}
+      <main className="max-w-7xl mx-auto px-4 py-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Left Column - Now Playing */}
+          <div className="lg:col-span-2 space-y-6">
+            {/* Album Art & Visualizer */}
+            <div className="relative">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <AlbumArt
+                  track={currentTrack}
+                  isPlaying={state.isPlaying}
+                  className="w-full max-w-sm mx-auto"
+                />
+                
+                {/* Visualizer */}
+                <div className="hidden md:block bg-gray-800/50 backdrop-blur-lg rounded-2xl p-4 h-64">
+                  <AudioVisualizer
+                    analyser={analyserRef.current}
+                    isPlaying={state.isPlaying}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Track Info */}
+            <div className="text-center">
+              <h2 className="text-2xl font-bold text-white truncate">
+                {currentTrack?.title || 'No Track Selected'}
+              </h2>
+              <p className="text-gray-400 mt-1">
+                {currentTrack?.artist || 'Select a track to play'}
+              </p>
+              {currentTrack?.album && (
+                <p className="text-gray-500 text-sm mt-1">{currentTrack.album}</p>
+              )}
+            </div>
+
+            {/* Player Controls */}
+            <div className="bg-gray-800/50 backdrop-blur-lg rounded-2xl p-6">
+              <PlayerControls
+                isPlaying={state.isPlaying}
+                isLoading={isLoading}
+                shuffle={state.shuffle}
+                repeatMode={state.repeatMode}
+                volume={state.volume}
+                isMuted={state.isMuted}
+                playbackRate={state.playbackRate}
+                currentTime={state.currentTime}
+                duration={state.duration}
+                onPlayPause={togglePlay}
+                onPrevious={previous}
+                onNext={next}
+                onShuffle={toggleShuffle}
+                onRepeat={toggleRepeat}
+                onVolumeChange={setVolume}
+                onMuteToggle={toggleMute}
+                onPlaybackRateChange={setPlaybackRate}
+                onSeek={seek}
+              />
+            </div>
+
+            {/* Equalizer Panel - Mobile */}
+            {showEqualizer && (
+              <div className="lg:hidden">
+                <Equalizer
+                  gains={equalizerGains}
+                  frequencies={FREQUENCIES}
+                  presets={EQUALIZER_PRESETS}
+                  currentPreset={currentPreset}
+                  onGainChange={setBandGain}
+                  onPresetChange={applyPreset}
+                />
+              </div>
+            )}
+            
+            {/* Spatial Audio Panel - Mobile */}
+            {showSpatial && (
+              <div className="lg:hidden">
+                <SpatialAudio
+                  currentPreset={currentSpatialPreset}
+                  spatialMode={spatialMode}
+                  presets={SPATIAL_PRESETS}
+                  onPresetChange={applySpatialPreset}
+                />
+              </div>
+            )}
+          </div>
+
+          {/* Right Column - Playlist & Equalizer */}
+          <div className="space-y-6">
+            {/* Playlist */}
+            <Playlist
+              tracks={playlist}
+              currentTrackIndex={state.currentTrackIndex}
+              isPlaying={state.isPlaying}
+              onTrackSelect={playTrack}
+              onRemoveTrack={removeFromPlaylist}
+              onReorder={reorderPlaylist}
+            />
+
+            {/* File Upload */}
+            <FileUpload onFilesAdded={handleFilesAdded} />
+
+            {/* Equalizer - Desktop */}
+            {showEqualizer && (
+              <div className="hidden lg:block">
+                <Equalizer
+                  gains={equalizerGains}
+                  frequencies={FREQUENCIES}
+                  presets={EQUALIZER_PRESETS}
+                  currentPreset={currentPreset}
+                  onGainChange={setBandGain}
+                  onPresetChange={applyPreset}
+                />
+              </div>
+            )}
+            
+            {/* Spatial Audio - Desktop */}
+            {showSpatial && (
+              <div className="hidden lg:block">
+                <SpatialAudio
+                  currentPreset={currentSpatialPreset}
+                  spatialMode={spatialMode}
+                  presets={SPATIAL_PRESETS}
+                  onPresetChange={applySpatialPreset}
+                />
+              </div>
+            )}
+          </div>
+        </div>
+      </main>
+
+      {/* Keyboard Shortcuts Modal */}
+      <ShortcutsModal
+        isOpen={showShortcuts}
+        onClose={() => setShowShortcuts(false)}
+        shortcuts={shortcuts}
+      />
+
+      {/* Footer */}
+      <footer className="text-center py-4 text-gray-500 text-sm">
+        <p>Press <kbd className="px-2 py-1 bg-gray-800 rounded text-xs">?</kbd> for keyboard shortcuts</p>
+      </footer>
+
+      <style>{`
+        .custom-scrollbar::-webkit-scrollbar {
+          width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+          background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+          background: rgba(139, 92, 246, 0.3);
+          border-radius: 3px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+          background: rgba(139, 92, 246, 0.5);
+        }
+        @keyframes pulse-subtle {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.9; }
+        }
+        .animate-pulse-subtle {
+          animation: pulse-subtle 2s ease-in-out infinite;
+        }
+        .equalizer-slider {
+          -webkit-appearance: none;
+          background: transparent;
+        }
+        .equalizer-slider::-webkit-slider-thumb {
+          -webkit-appearance: none;
+          height: 16px;
+          width: 16px;
+          border-radius: 50%;
+          background: linear-gradient(135deg, #a855f7, #ec4899);
+          cursor: pointer;
+          margin-top: -6px;
+          box-shadow: 0 2px 6px rgba(168, 85, 247, 0.5);
+        }
+        .equalizer-slider::-webkit-slider-runnable-track {
+          width: 100%;
+          height: 4px;
+          cursor: pointer;
+          background: linear-gradient(to right, #374151, #4b5563);
+          border-radius: 2px;
+        }
+        .animation-delay-100 {
+          animation-delay: 0.1s;
+        }
+        .animation-delay-200 {
+          animation-delay: 0.2s;
+        }
+        .animation-delay-300 {
+          animation-delay: 0.3s;
+        }
+      `}</style>
+    </div>
+  );
+}
