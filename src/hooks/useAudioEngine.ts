@@ -326,7 +326,6 @@ export function useAudioEngine() {
     // 🎛️ MULTIBAND MASTERING CHAIN (APPLE-STYLE DYNAMICS)
     // =========================================================
     
-    // Вход за кросоувъра
     const masteringInput = audioContext.createGain();
     analyser.connect(masteringInput);
 
@@ -335,15 +334,21 @@ export function useAudioEngine() {
     lowFilter.type = 'lowpass';
     lowFilter.frequency.value = 250;
     
+    // THE JUICE FIX: Разхлабена компресия за сочен бас
     const lowCompressor = audioContext.createDynamicsCompressor();
-    lowCompressor.threshold.value = -8.0;
+    lowCompressor.threshold.value = -4.0; // Беше -8.0 (компресира само пиковете)
     lowCompressor.knee.value = 5.0;
-    lowCompressor.ratio.value = 4.0;
-    lowCompressor.attack.value = 0.010; // 10ms (запазва удара на kick барабана)
-    lowCompressor.release.value = 0.100;
+    lowCompressor.ratio.value = 2.0; // Беше 4.0 (вече е нежна прегръдка)
+    lowCompressor.attack.value = 0.015; // Беше 0.010 (позволява на ритника да удари)
+    lowCompressor.release.value = 0.150; // Беше 0.100 (басът отзвучава естествено)
     
+    // Make-up Gain за Бас Лентата (+15% обем)
+    const lowGain = audioContext.createGain();
+    lowGain.gain.value = 1.15; 
+
     masteringInput.connect(lowFilter);
     lowFilter.connect(lowCompressor);
+    lowCompressor.connect(lowGain); // Свързваме компресора към новия усилвател
 
     // --- 2. MID BAND (Вокали и Присъствие: 250Hz - 4000Hz) ---
     const midFilterLow = audioContext.createBiquadFilter();
@@ -357,7 +362,7 @@ export function useAudioEngine() {
     const midCompressor = audioContext.createDynamicsCompressor();
     midCompressor.threshold.value = -4.0;
     midCompressor.knee.value = 10.0;
-    midCompressor.ratio.value = 2.5; // Нежна 'Glue' компресия
+    midCompressor.ratio.value = 2.5; 
     midCompressor.attack.value = 0.020; 
     midCompressor.release.value = 0.200;
     
@@ -373,8 +378,8 @@ export function useAudioEngine() {
     const highCompressor = audioContext.createDynamicsCompressor();
     highCompressor.threshold.value = -6.0;
     highCompressor.knee.value = 5.0;
-    highCompressor.ratio.value = 6.0; // По-агресивно за укротяване на съскането (De-Esser)
-    highCompressor.attack.value = 0.002; // Супер бързо (2ms)
+    highCompressor.ratio.value = 6.0; 
+    highCompressor.attack.value = 0.002; 
     highCompressor.release.value = 0.050;
     
     masteringInput.connect(highFilter);
@@ -382,17 +387,18 @@ export function useAudioEngine() {
 
     // --- FINAL SUMMING & BRICKWALL LIMITER ---
     const masterSum = audioContext.createGain();
-    masterSum.gain.value = 1.1; // Лека компенсация на нивото след компресорите
+    masterSum.gain.value = 1.1; 
     
-    lowCompressor.connect(masterSum);
+    // Събираме трите ленти обратно (включително усиления бас)
+    lowGain.connect(masterSum); 
     midCompressor.connect(masterSum);
     highCompressor.connect(masterSum);
     
     const finalLimiter = audioContext.createDynamicsCompressor();
     finalLimiter.threshold.value = -0.5;
     finalLimiter.knee.value = 0.0;
-    finalLimiter.ratio.value = 20.0; // Истински Brickwall
-    finalLimiter.attack.value = 0.001; // 1ms
+    finalLimiter.ratio.value = 20.0; 
+    finalLimiter.attack.value = 0.001; 
     finalLimiter.release.value = 0.050;
     
     masterSum.connect(finalLimiter);
