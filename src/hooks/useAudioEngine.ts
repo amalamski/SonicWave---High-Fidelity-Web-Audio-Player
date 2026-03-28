@@ -293,11 +293,10 @@ export function useAudioEngine() {
     highpass.Q.value = 0.7;
     spatialHighpassRef.current = highpass;
 
-    // ИСТИНСКИ СОЧЕН БАС (Психоакустичен филтър свален на 80Hz)
     const spatialBassBoost = audioContext.createBiquadFilter();
     spatialBassBoost.type = 'peaking';
-    spatialBassBoost.frequency.value = 80; // Свален от 150 на 80 (сочната част на баса)
-    spatialBassBoost.Q.value = 0.6; // По-широка, топла камбана
+    spatialBassBoost.frequency.value = 80; 
+    spatialBassBoost.Q.value = 0.6; 
     spatialBassBoost.gain.value = 0; 
     spatialBassBoostRef.current = spatialBassBoost;
 
@@ -323,15 +322,81 @@ export function useAudioEngine() {
     spatialBassBoost.connect(stereoPanner);
     stereoPanner.connect(analyser);
     
-    const limiter = audioContext.createDynamicsCompressor();
-    limiter.threshold.value = -1.0;
-    limiter.knee.value = 0.0;
-    limiter.ratio.value = 20.0;
-    limiter.attack.value = 0.001; 
-    limiter.release.value = 0.050;
+    // =========================================================
+    // 🎛️ MULTIBAND MASTERING CHAIN (APPLE-STYLE DYNAMICS)
+    // =========================================================
     
-    analyser.connect(limiter);
-    limiter.connect(audioContext.destination);
+    // Вход за кросоувъра
+    const masteringInput = audioContext.createGain();
+    analyser.connect(masteringInput);
+
+    // --- 1. LOW BAND (Тяло и Бас: под 250Hz) ---
+    const lowFilter = audioContext.createBiquadFilter();
+    lowFilter.type = 'lowpass';
+    lowFilter.frequency.value = 250;
+    
+    const lowCompressor = audioContext.createDynamicsCompressor();
+    lowCompressor.threshold.value = -8.0;
+    lowCompressor.knee.value = 5.0;
+    lowCompressor.ratio.value = 4.0;
+    lowCompressor.attack.value = 0.010; // 10ms (запазва удара на kick барабана)
+    lowCompressor.release.value = 0.100;
+    
+    masteringInput.connect(lowFilter);
+    lowFilter.connect(lowCompressor);
+
+    // --- 2. MID BAND (Вокали и Присъствие: 250Hz - 4000Hz) ---
+    const midFilterLow = audioContext.createBiquadFilter();
+    midFilterLow.type = 'highpass';
+    midFilterLow.frequency.value = 250;
+    
+    const midFilterHigh = audioContext.createBiquadFilter();
+    midFilterHigh.type = 'lowpass';
+    midFilterHigh.frequency.value = 4000;
+    
+    const midCompressor = audioContext.createDynamicsCompressor();
+    midCompressor.threshold.value = -4.0;
+    midCompressor.knee.value = 10.0;
+    midCompressor.ratio.value = 2.5; // Нежна 'Glue' компресия
+    midCompressor.attack.value = 0.020; 
+    midCompressor.release.value = 0.200;
+    
+    masteringInput.connect(midFilterLow);
+    midFilterLow.connect(midFilterHigh);
+    midFilterHigh.connect(midCompressor);
+
+    // --- 3. HIGH BAND (Въздух и Коприна: над 4000Hz) ---
+    const highFilter = audioContext.createBiquadFilter();
+    highFilter.type = 'highpass';
+    highFilter.frequency.value = 4000;
+    
+    const highCompressor = audioContext.createDynamicsCompressor();
+    highCompressor.threshold.value = -6.0;
+    highCompressor.knee.value = 5.0;
+    highCompressor.ratio.value = 6.0; // По-агресивно за укротяване на съскането (De-Esser)
+    highCompressor.attack.value = 0.002; // Супер бързо (2ms)
+    highCompressor.release.value = 0.050;
+    
+    masteringInput.connect(highFilter);
+    highFilter.connect(highCompressor);
+
+    // --- FINAL SUMMING & BRICKWALL LIMITER ---
+    const masterSum = audioContext.createGain();
+    masterSum.gain.value = 1.1; // Лека компенсация на нивото след компресорите
+    
+    lowCompressor.connect(masterSum);
+    midCompressor.connect(masterSum);
+    highCompressor.connect(masterSum);
+    
+    const finalLimiter = audioContext.createDynamicsCompressor();
+    finalLimiter.threshold.value = -0.5;
+    finalLimiter.knee.value = 0.0;
+    finalLimiter.ratio.value = 20.0; // Истински Brickwall
+    finalLimiter.attack.value = 0.001; // 1ms
+    finalLimiter.release.value = 0.050;
+    
+    masterSum.connect(finalLimiter);
+    finalLimiter.connect(audioContext.destination);
 
     convolver.buffer = generateImpulseResponse(audioContext, 0.01, 100);
     setIsSpatialLoaded(true);
@@ -397,7 +462,6 @@ export function useAudioEngine() {
           spatialDryGainRef.current.gain.setTargetAtTime(1.0, currentTime, 0.05);
           spatialWetGainRef.current.gain.setTargetAtTime(0.40, currentTime, 0.05);
           spatialLowpassRef.current.frequency.setTargetAtTime(safeFreq(16000), currentTime, 0.05);
-          // ПО-СОЧЕН БАС: Сваляме High-Pass от 120Hz на 80Hz. Басът има леко 3D тяло.
           spatialHighpassRef.current.frequency.setTargetAtTime(80, currentTime, 0.05); 
           spatialBassBoostRef.current.gain.setTargetAtTime(0, currentTime, 0.05);
           break;
@@ -411,9 +475,7 @@ export function useAudioEngine() {
           spatialDryGainRef.current.gain.setTargetAtTime(1.0, currentTime, 0.05);
           spatialWetGainRef.current.gain.setTargetAtTime(0.50, currentTime, 0.05); 
           spatialLowpassRef.current.frequency.setTargetAtTime(safeFreq(16000), currentTime, 0.05); 
-          // ПО-СОЧЕН БАС: Сваляме High-Pass на 90Hz (беше 150)
           spatialHighpassRef.current.frequency.setTargetAtTime(90, currentTime, 0.05); 
-          // ТОПЪЛ БУУСТ: +2.0 dB на 80Hz (Истински дълбок сок)
           spatialBassBoostRef.current.gain.setTargetAtTime(2.0, currentTime, 0.05);
           break;
 
@@ -426,9 +488,7 @@ export function useAudioEngine() {
           spatialDryGainRef.current.gain.setTargetAtTime(1.0, currentTime, 0.05);
           spatialWetGainRef.current.gain.setTargetAtTime(0.60, currentTime, 0.05); 
           spatialLowpassRef.current.frequency.setTargetAtTime(safeFreq(18000), currentTime, 0.05);
-          // КИНО БАС: Сваляме High-Pass на 60Hz. Оставяме LFE (суб-баса) да вибрира в стаята!
           spatialHighpassRef.current.frequency.setTargetAtTime(60, currentTime, 0.05); 
-          // КИНО ТЕЖЕСТ: +2.5 dB на 80Hz
           spatialBassBoostRef.current.gain.setTargetAtTime(2.5, currentTime, 0.05);
           break;
       }
